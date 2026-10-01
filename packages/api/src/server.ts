@@ -5,6 +5,8 @@ import { serializeError } from 'serialize-error';
 import app from '@/api-app';
 import * as config from '@/config';
 import { LOCAL_APP_TEAM } from '@/controllers/team';
+import { closeDb, openDb } from '@/db';
+import { migrate } from '@/db/migrate';
 import { runStartupMigrations } from '@/migrations';
 import { connectDBWithRetry, mongooseConnection } from '@/models';
 import opampApp from '@/opamp/app';
@@ -29,6 +31,12 @@ export default class Server {
   protected async shutdown(_signal?: string) {
     let hasError = false;
     logger.info('Closing all db clients...');
+    try {
+      closeDb(true);
+    } catch (err) {
+      hasError = true;
+      logger.error({ err: serializeError(err) }, 'SQLite client close failed');
+    }
     const [mongoCloseResult] = await Promise.allSettled([
       mongooseConnection.close(false),
     ]);
@@ -96,6 +104,8 @@ export default class Server {
     // until the connection below succeeds. Retries forever — see
     // connectDBWithRetry for why a single failed initial connect must not be
     // allowed to leave the process running but permanently unable to serve.
+    openDb();
+    migrate();
     await connectDBWithRetry();
 
     await runStartupMigrations();

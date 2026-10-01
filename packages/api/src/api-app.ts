@@ -1,10 +1,11 @@
 import compression from 'compression';
-import MongoStore from 'connect-mongo';
 import express from 'express';
 import session from 'express-session';
 import onHeaders from 'on-headers';
 
 import * as config from './config';
+import { pruneExpired } from './db/retention';
+import SqliteSessionStore from './db/sessionStore';
 import mcpRouter from './mcp/app';
 import { isUserAuthenticated } from './middleware/auth';
 import defaultCors from './middleware/cors';
@@ -39,7 +40,7 @@ const sess: session.SessionOptions & { cookie: session.CookieOptions } = {
     maxAge: 1000 * 60 * 60 * 24 * 30, // 30 days
   },
   rolling: true,
-  store: new MongoStore({ mongoUrl: config.MONGO_URI }),
+  store: new SqliteSessionStore(),
 };
 
 app.set('trust proxy', 1);
@@ -84,6 +85,9 @@ app.use(defaultCors);
 // ---------------------------------------------------------------------
 if (config.USAGE_STATS_ENABLED && !config.IS_CI) {
   usageStats();
+}
+if (!config.IS_INLINE_API) {
+  setInterval(() => pruneExpired(), 10 * 60 * 1000).unref();
 }
 // ---------------------------------------------------------------------
 
