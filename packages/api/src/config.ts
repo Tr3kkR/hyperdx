@@ -39,6 +39,7 @@ export const IS_CI = NODE_ENV === 'test';
 export const IS_DEV = NODE_ENV === 'development';
 export const IS_PROD = NODE_ENV === 'production';
 export const MONGO_URI = env.MONGO_URI;
+export const SQLITE_PATH = env.SQLITE_PATH || './hyperdx.db';
 export const OTEL_SERVICE_NAME = env.OTEL_SERVICE_NAME as string;
 export const PORT = Number.parseInt(env.PORT as string);
 export const OPAMP_PORT = Number.parseInt(env.OPAMP_PORT as string);

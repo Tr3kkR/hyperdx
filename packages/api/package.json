@@ -32,6 +32,7 @@
     "@types/node": "^22.15.18",
     "ai": "^6.0.116",
     "aws4": "^1.13.2",
+    "bson": "6.10.3",
     "chrono-node": "^2.9.0",
     "compression": "^1.7.4",
     "concurrently": "^9.1.2",

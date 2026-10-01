@@ -8,6 +8,8 @@ import {
 import fs from 'fs';
 import path from 'path';
 
+import { closeDb, openDb } from '@/db';
+import { migrate } from '@/db/migrate';
 import { connectDB, mongooseConnection } from '@/models';
 import Dashboard from '@/models/dashboard';
 import Team from '@/models/team';
@@ -127,6 +129,8 @@ export default class ProvisionDashboardsTask implements HdxTask {
   }
 
   async execute(): Promise<void> {
+    openDb();
+    migrate();
     await connectDB();
 
     const dir = process.env.DASHBOARD_PROVISIONER_DIR;
@@ -186,5 +190,6 @@ export default class ProvisionDashboardsTask implements HdxTask {
 
   async asyncDispose(): Promise<void> {
     await mongooseConnection.close();
+    closeDb();
   }
 }

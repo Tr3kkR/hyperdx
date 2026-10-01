@@ -14,6 +14,9 @@ import { ClickhouseClient } from '@/clickhouse';
 import * as config from '@/config';
 import { ALERT_HISTORY_QUERY_CONCURRENCY } from '@/controllers/alertHistory';
 import { LOCAL_APP_TEAM } from '@/controllers/team';
+import { closeDb, openDb } from '@/db';
+import { migrate } from '@/db/migrate';
+import { pruneExpired } from '@/db/retention';
 import { connectDB, mongooseConnection, ObjectId } from '@/models';
 import Alert, {
   AlertSource,
@@ -409,6 +412,9 @@ async function loadAlert(
 
 export default class DefaultAlertProvider implements AlertProvider {
   async init() {
+    openDb();
+    migrate();
+    pruneExpired();
     // The check-alerts worker only reads from MongoDB and never needs to
     // ensure indexes exist (the API service owns that). Disabling autoIndex
     // prevents background createIndexes calls from racing the short-lived
@@ -419,6 +425,7 @@ export default class DefaultAlertProvider implements AlertProvider {
 
   async asyncDispose() {
     await Promise.all([mongooseConnection.close()]);
+    closeDb();
   }
 
   async getAlertTasks(): Promise<AlertTask[]> {

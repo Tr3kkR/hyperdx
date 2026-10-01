@@ -26,6 +26,8 @@ import { serializeError } from 'serialize-error';
 
 import app from './api-app';
 import * as config from './config';
+import { openDb } from './db';
+import { migrate } from './db/migrate';
 import { connectDB } from './models';
 import logger from './utils/logger';
 
@@ -47,16 +49,22 @@ let dbReady: Promise<void> | null = null;
 
 function ensureDb(): Promise<void> {
   if (dbReady == null) {
-    dbReady = connectDB().catch(err => {
-      // Reset the cache so the next invocation re-attempts the connection
-      // rather than permanently rejecting with a stale error.
-      dbReady = null;
-      logger.error(
-        { err: serializeError(err) },
-        'Serverless API failed to connect to MongoDB',
-      );
-      throw err;
-    });
+    dbReady = Promise.resolve()
+      .then(async () => {
+        openDb();
+        migrate();
+        await connectDB();
+      })
+      .catch(err => {
+        // Reset the cache so the next invocation re-attempts the connection
+        // rather than permanently rejecting with a stale error.
+        dbReady = null;
+        logger.error(
+          { err: serializeError(err) },
+          'Serverless API failed to connect to MongoDB',
+        );
+        throw err;
+      });
   }
   return dbReady;
 }
