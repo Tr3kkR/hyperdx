@@ -6,7 +6,7 @@ import {
   DEFAULT_LOGS_TABLE,
 } from '@/fixtures';
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
-import { Source } from '@/models/source';
+import { createSourceFixture } from '@/test/sqliteMetadata';
 
 import { setupDashboardTests } from './setup';
 
@@ -203,7 +203,7 @@ describe('MCP Dashboard Tools - clickstack_query_tiles', () => {
   });
 
   it('reports rowCount and hasData for a tile returning rows', async () => {
-    const logSource = await Source.create({
+    const logSource = await createSourceFixture({
       kind: SourceKind.Log,
       team: ctx.team._id,
       from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
@@ -452,7 +452,7 @@ describe('MCP Dashboard Tools - clickstack_query_tiles', () => {
     });
 
     it('runs an event_patterns tile with a variable macro in the batch', async () => {
-      const logSource = await Source.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: ctx.team._id,
         from: {

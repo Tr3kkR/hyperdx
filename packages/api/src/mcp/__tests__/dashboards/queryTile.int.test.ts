@@ -11,7 +11,7 @@ import {
   seedExponentialHistogramMetric,
 } from '@/fixtures';
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
-import { Source } from '@/models/source';
+import { createSourceFixture } from '@/test/sqliteMetadata';
 
 import { setupDashboardTests } from './setup';
 
@@ -123,7 +123,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
   });
 
   it('should save and query a metric formula tile', async () => {
-    const metricSource = await Source.create({
+    const metricSource = await createSourceFixture({
       kind: SourceKind.Metric,
       team: ctx.team._id,
       from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -217,7 +217,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
     // Event (log/trace) formulas render through a different path than
     // metric formulas (inline single-scan SELECT vs the composed query),
     // so cover them end-to-end: save → round-trip → query_tile.
-    const logSource = await Source.create({
+    const logSource = await createSourceFixture({
       kind: SourceKind.Log,
       team: ctx.team._id,
       from: {
@@ -298,7 +298,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
   });
 
   it('should reject a formula tile on a formula-incapable source kind', async () => {
-    const sessionSource = await Source.create({
+    const sessionSource = await createSourceFixture({
       kind: SourceKind.Session,
       team: ctx.team._id,
       from: {
@@ -336,7 +336,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
   });
 
   it('should reject a formula referencing an unknown series', async () => {
-    const metricSource = await Source.create({
+    const metricSource = await createSourceFixture({
       kind: SourceKind.Metric,
       team: ctx.team._id,
       from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -374,7 +374,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
   });
 
   it('should save and query an exponential histogram tile', async () => {
-    const metricSource = await Source.create({
+    const metricSource = await createSourceFixture({
       kind: SourceKind.Metric,
       team: ctx.team._id,
       from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -448,7 +448,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
     const now = new Date();
 
     it('queries a grouped bar tile over an exponential histogram', async () => {
-      const metricSource = await Source.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: ctx.team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -530,7 +530,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
     });
 
     it('queries a grouped bar tile over a (regular) histogram', async () => {
-      const metricSource = await Source.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: ctx.team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -705,7 +705,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
     let logSourceId: string;
 
     beforeEach(async () => {
-      const logSource = await Source.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: ctx.team._id,
         from: {
@@ -1141,7 +1141,7 @@ describe('MCP Dashboard Tools - clickstack_query_tile', () => {
     let logSourceId: string;
 
     beforeEach(async () => {
-      const logSource = await Source.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: ctx.team._id,
         from: {

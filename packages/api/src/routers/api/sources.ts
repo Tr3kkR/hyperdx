@@ -24,12 +24,7 @@ router.get('/', async (req, res, next) => {
 
     const sources = await getSources(teamId.toString());
 
-    return res.json(
-      sources.map(
-        // @ts-expect-error source.toJSON has incompatible type signatures but is actually a safe operation
-        source => source.toJSON({ getters: true }),
-      ),
-    );
+    return res.json(sources);
   } catch (e) {
     next(e);
   }
@@ -54,10 +49,10 @@ router.post(
           .json({ message: connectionCheck.message });
       }
 
-      const source = await createSource(teamId.toString(), {
-        ...req.body,
-        team: teamId.toString(),
-      });
+      const source = await createSource(
+        teamId.toString(),
+        SourceSchemaNoId.parse(req.body),
+      );
 
       res.json(source);
     } catch (e) {
@@ -88,10 +83,11 @@ router.put(
           .json({ message: connectionCheck.message });
       }
 
-      const source = await updateSource(teamId.toString(), req.params.id, {
-        ...req.body,
-        team: teamId.toString(),
-      });
+      const source = await updateSource(
+        teamId.toString(),
+        req.params.id,
+        SourceSchemaNoId.parse(req.body),
+      );
 
       if (!source) {
         res.status(404).send('Source not found');

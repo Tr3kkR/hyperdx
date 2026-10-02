@@ -14,6 +14,8 @@ import ms from 'ms';
 import * as config from '@/config';
 import { createAlert } from '@/controllers/alerts';
 import { createTeam } from '@/controllers/team';
+import type { SourceDoc } from '@/db/repos/sources';
+import * as sourcesRepo from '@/db/repos/sources';
 import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import {
   bulkInsertData,
@@ -30,10 +32,8 @@ import {
 } from '@/fixtures';
 import Alert, { AlertSource, IAlert } from '@/models/alert';
 import AlertHistory from '@/models/alertHistory';
-import Connection, { IConnection } from '@/models/connection';
 import Dashboard, { IDashboard } from '@/models/dashboard';
 import { ISavedSearch, SavedSearch } from '@/models/savedSearch';
-import { ISource, LogSource, Source } from '@/models/source';
 import Webhook, { IWebhook } from '@/models/webhook';
 import * as checkAlert from '@/tasks/checkAlerts';
 import {
@@ -60,6 +60,11 @@ import {
   renderAlertTemplate,
   translateExternalActionsToInternal,
 } from '@/tasks/checkAlerts/template';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+  setSourceTableFilterFixture,
+} from '@/test/sqliteMetadata';
 import * as slack from '@/utils/slack';
 
 // Create provider instance for tests
@@ -2086,7 +2091,7 @@ describe('checkAlerts', () => {
         [webhook._id.toString(), webhook],
       ]);
 
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Default',
         host: config.CLICKHOUSE_HOST,
@@ -2094,7 +2099,7 @@ describe('checkAlerts', () => {
         password: config.CLICKHOUSE_PASSWORD,
       });
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'log',
         team: team._id,
         from: {
@@ -2136,7 +2141,7 @@ describe('checkAlerts', () => {
 
     const createAlertDetails = async (
       team: ITeam,
-      source: ISource | undefined,
+      source: SourceDoc | undefined,
       alertConfig: Parameters<typeof createAlert>[1],
       additionalDetails:
         | {
@@ -2179,7 +2184,7 @@ describe('checkAlerts', () => {
       now: Date,
       details: AlertDetails,
       clickhouseClient: ClickhouseClient,
-      connection: IConnection,
+      connection: string | { id: string },
       alertProvider: AlertProvider,
       teamWebhooksById: Map<string, IWebhook>,
     ) => {
@@ -2195,7 +2200,7 @@ describe('checkAlerts', () => {
           recentHistoryMap,
         },
         clickhouseClient,
-        connection.id,
+        typeof connection === 'string' ? connection : connection.id,
         alertProvider,
         teamWebhooksById,
       );
@@ -2499,11 +2504,8 @@ describe('checkAlerts', () => {
       // (not the base Source schema), so we must update through `LogSource`
       // — `Source.updateOne` would silently drop the field under Mongoose's
       // default strict mode.
-      await LogSource.updateOne(
-        { _id: source._id },
-        { $set: { tableFilterExpression: "ServiceName != 'excluded'" } },
-      );
-      const filteredSource = await Source.findById(source._id);
+      setSourceTableFilterFixture(source._id, "ServiceName != 'excluded'");
+      const filteredSource = sourcesRepo.findById(String(source._id));
 
       const details = await createAlertDetails(
         team,
@@ -2598,7 +2600,7 @@ describe('checkAlerts', () => {
       });
 
       try {
-        const source = await Source.create({
+        const source = await createSourceFixture({
           kind: 'log',
           team: team._id,
           from: {
@@ -7248,7 +7250,7 @@ describe('checkAlerts', () => {
 
       await bulkInsertMetricsGauge(gaugePointsA);
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'metric',
         team: team._id,
         from: {
@@ -7446,7 +7448,7 @@ describe('checkAlerts', () => {
 
       await bulkInsertMetricsGauge(gaugePoints);
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'metric',
         team: team._id,
         from: {
@@ -7627,7 +7629,7 @@ describe('checkAlerts', () => {
         .spyOn(slack, 'postMessageToWebhook')
         .mockResolvedValue({ text: 'ok' });
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'metric',
         team: team._id,
         from: {
@@ -9766,7 +9768,7 @@ describe('checkAlerts', () => {
         [webhook._id.toString(), webhook],
       ]);
 
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Default',
         host: config.CLICKHOUSE_HOST,
@@ -9774,7 +9776,7 @@ describe('checkAlerts', () => {
         password: config.CLICKHOUSE_PASSWORD,
       });
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'log',
         team: team._id,
         from: {
@@ -9874,7 +9876,7 @@ describe('checkAlerts', () => {
         [webhook._id.toString(), webhook],
       ]);
 
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Default',
         host: config.CLICKHOUSE_HOST,
@@ -9882,7 +9884,7 @@ describe('checkAlerts', () => {
         password: config.CLICKHOUSE_PASSWORD,
       });
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'log',
         team: team._id,
         from: {
@@ -9973,7 +9975,7 @@ describe('checkAlerts', () => {
         [webhook._id.toString(), webhook],
       ]);
 
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Default',
         host: config.CLICKHOUSE_HOST,
@@ -9981,7 +9983,7 @@ describe('checkAlerts', () => {
         password: config.CLICKHOUSE_PASSWORD,
       });
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'log',
         team: team._id,
         from: {
@@ -11437,7 +11439,7 @@ describe('checkAlerts', () => {
         [webhook._id.toString(), webhook],
       ]);
 
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Default',
         host: config.CLICKHOUSE_HOST,
@@ -11445,7 +11447,7 @@ describe('checkAlerts', () => {
         password: config.CLICKHOUSE_PASSWORD,
       });
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: 'log',
         team: team._id,
         from: {

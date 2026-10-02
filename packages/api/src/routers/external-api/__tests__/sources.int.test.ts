@@ -3,6 +3,9 @@ import mongoose from 'mongoose';
 import request, { SuperAgentTest } from 'supertest';
 
 import * as config from '@/config';
+import { getDb } from '@/db';
+import { newId } from '@/db/ids';
+import type { ConnectionDoc } from '@/db/repos/connections';
 import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import type { UserDoc as IUser } from '@/db/repos/users';
 import {
@@ -11,26 +14,21 @@ import {
   getLoggedInAgent,
   getServer,
 } from '@/fixtures';
-import Connection, { IConnection } from '@/models/connection';
-import {
-  ISource,
-  LogSource,
-  MetricSource,
-  SessionSource,
-  Source,
-  TraceSource,
-} from '@/models/source';
 import {
   mapGranularityToExternalFormat,
   mapGranularityToInternalFormat,
 } from '@/routers/external-api/v2/sources';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 describe('External API v2 Sources', () => {
   const server = getServer();
   let agent: SuperAgentTest;
   let team: ITeam;
   let user: IUser;
-  let connection: IConnection;
+  let connection: ConnectionDoc;
 
   beforeAll(async () => {
     await server.start();
@@ -42,7 +40,7 @@ describe('External API v2 Sources', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: new mongoose.Types.ObjectId(team._id),
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -82,7 +80,7 @@ describe('External API v2 Sources', () => {
     });
 
     it('should return a single log source', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Log Source',
@@ -118,7 +116,7 @@ describe('External API v2 Sources', () => {
     });
 
     it('should return a single trace source', async () => {
-      const traceSource = await TraceSource.create({
+      const traceSource = await createSourceFixture({
         kind: SourceKind.Trace,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Trace Source',
@@ -260,7 +258,7 @@ describe('External API v2 Sources', () => {
     });
 
     it('should return a single metric source', async () => {
-      const metricSource = await MetricSource.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Metric Source',
@@ -303,7 +301,7 @@ describe('External API v2 Sources', () => {
     });
 
     it('should return a single session source', async () => {
-      const traceSource = await TraceSource.create({
+      const traceSource = await createSourceFixture({
         kind: SourceKind.Trace,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Trace Source for Session',
@@ -323,7 +321,7 @@ describe('External API v2 Sources', () => {
         connection: connection._id,
       });
 
-      const sessionSource = await SessionSource.create({
+      const sessionSource = await createSourceFixture({
         kind: SourceKind.Session,
         team: team._id.toString(),
         name: 'Test Session Source',
@@ -334,7 +332,7 @@ describe('External API v2 Sources', () => {
         timestampValueExpression: 'Timestamp',
         traceSourceId: traceSource._id.toString(),
         connection: connection._id.toString(),
-      } satisfies Omit<Extract<ISource, { kind: SourceKind.Session }>, 'id'>);
+      });
 
       const response = await authRequest('get', BASE_URL).expect(200);
 
@@ -360,7 +358,7 @@ describe('External API v2 Sources', () => {
     });
 
     it('should return multiple sources of different kinds', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Logs',
@@ -373,7 +371,7 @@ describe('External API v2 Sources', () => {
         connection: connection._id,
       });
 
-      const traceSource = await TraceSource.create({
+      const traceSource = await createSourceFixture({
         kind: SourceKind.Trace,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Traces',
@@ -393,7 +391,7 @@ describe('External API v2 Sources', () => {
         connection: connection._id,
       });
 
-      const metricSource = await MetricSource.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Metrics',
@@ -426,7 +424,7 @@ describe('External API v2 Sources', () => {
 
     it("should only return sources for the authenticated user's team", async () => {
       // Create a source for the current team
-      const currentTeamSource = await LogSource.create({
+      const currentTeamSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Current Team Source',
@@ -441,7 +439,7 @@ describe('External API v2 Sources', () => {
 
       // Create another team and source
       const otherTeamId = new mongoose.Types.ObjectId();
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: otherTeamId,
         name: 'Other Team Connection',
         host: config.CLICKHOUSE_HOST,
@@ -449,7 +447,7 @@ describe('External API v2 Sources', () => {
         password: config.CLICKHOUSE_PASSWORD,
       });
 
-      await LogSource.create({
+      await createSourceFixture({
         kind: SourceKind.Log,
         team: otherTeamId,
         name: 'Other Team Source',
@@ -471,7 +469,7 @@ describe('External API v2 Sources', () => {
     });
 
     it('should format sources according to SourceSchema', async () => {
-      await LogSource.create({
+      await createSourceFixture({
         kind: SourceKind.Log,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Source',
@@ -502,7 +500,7 @@ describe('External API v2 Sources', () => {
 
     it('should filter out sources that fail schema validation', async () => {
       // Create a valid source
-      const validSource = await LogSource.create({
+      const validSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: new mongoose.Types.ObjectId(team._id),
         name: 'Valid Source',
@@ -515,19 +513,24 @@ describe('External API v2 Sources', () => {
         connection: connection._id,
       });
 
-      // Create an invalid source by bypassing Mongoose validation
-      // This simulates a source that might exist in the database but doesn't
-      // match the SourceSchema (e.g., due to schema evolution)
-      await Source.collection.insertOne({
-        kind: 'invalid-kind', // Invalid kind
-        team: new mongoose.Types.ObjectId(team._id),
-        name: 'Invalid Source',
-        from: {
-          databaseName: DEFAULT_DATABASE,
-          tableName: DEFAULT_LOGS_TABLE,
-        },
-        connection: connection._id,
-      });
+      // Bypass the repository to verify the external schema filters an
+      // incomplete row even when SQLite's table constraints accept it.
+      getDb()
+        .prepare(
+          `INSERT INTO sources
+        (id,team,connection,kind,name,config,createdAt,updatedAt)
+        VALUES (?,?,?,?,?,?,?,?)`,
+        )
+        .run(
+          newId(),
+          String(team._id),
+          connection._id,
+          SourceKind.Log,
+          'Invalid Source',
+          '{}',
+          Date.now(),
+          Date.now(),
+        );
 
       const response = await authRequest('get', BASE_URL).expect(200);
 
@@ -540,7 +543,7 @@ describe('External API v2 Sources', () => {
       const SECTION = 'Control Plane Prod';
 
       it('returns the section on a source that has one', async () => {
-        const logSource = await LogSource.create({
+        const logSource = await createSourceFixture({
           kind: SourceKind.Log,
           team: new mongoose.Types.ObjectId(team._id),
           name: 'Sectioned Log Source',
@@ -564,7 +567,7 @@ describe('External API v2 Sources', () => {
       });
 
       it('omits the section on a source that has none', async () => {
-        await LogSource.create({
+        await createSourceFixture({
           kind: SourceKind.Log,
           team: new mongoose.Types.ObjectId(team._id),
           name: 'Unsectioned Log Source',
@@ -582,92 +585,6 @@ describe('External API v2 Sources', () => {
         expect(response.body.data).toHaveLength(1);
         expect(response.body.data[0]).not.toHaveProperty('section');
       });
-    });
-  });
-
-  describe('backward compatibility with legacy flat-model documents', () => {
-    const BASE_URL = '/api/v2/sources';
-
-    it('returns legacy Session source without timestampValueExpression using default TimestampTime', async () => {
-      // Legacy Session sources were created before timestampValueExpression was
-      // required. applyLegacyDefaults() backfills 'TimestampTime' before
-      // SourceSchema.safeParse(), so these sources still appear in the response.
-      await Source.collection.insertOne({
-        kind: SourceKind.Session,
-        name: 'Legacy Session',
-        team: new mongoose.Types.ObjectId(team._id),
-        connection: connection._id,
-        from: { databaseName: DEFAULT_DATABASE, tableName: 'otel_sessions' },
-        traceSourceId: 'some-trace-source-id',
-        // timestampValueExpression intentionally omitted
-      });
-
-      const response = await authRequest('get', BASE_URL).expect(200);
-
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.data[0].kind).toBe(SourceKind.Session);
-      // Default is applied at read time, not persisted to the database
-      expect(response.body.data[0].timestampValueExpression).toBe(
-        'TimestampTime',
-      );
-    });
-
-    it('returns Trace source with logSourceId: null (Zod optional accepts null)', async () => {
-      // Old schema had logSourceId: z.string().optional().nullable()
-      // New schema removed .nullable() — however, Zod's optional() in
-      // discriminatedUnion context still accepts null values (they pass
-      // safeParse). This means logSourceId: null is NOT a breaking change.
-      await Source.collection.insertOne({
-        kind: SourceKind.Trace,
-        name: 'Trace with null logSourceId',
-        team: new mongoose.Types.ObjectId(team._id),
-        connection: connection._id,
-        from: { databaseName: DEFAULT_DATABASE, tableName: 'otel_traces' },
-        timestampValueExpression: 'Timestamp',
-        defaultTableSelectExpression: '*',
-        durationExpression: 'Duration',
-        durationPrecision: 3,
-        traceIdExpression: 'TraceId',
-        spanIdExpression: 'SpanId',
-        parentSpanIdExpression: 'ParentSpanId',
-        spanNameExpression: 'SpanName',
-        spanKindExpression: 'SpanKind',
-        logSourceId: null,
-      });
-
-      const response = await authRequest('get', BASE_URL).expect(200);
-
-      // Source IS returned — logSourceId: null passes Zod safeParse
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.data[0].kind).toBe(SourceKind.Trace);
-      expect(response.body.data[0].logSourceId).toBeNull();
-    });
-
-    it('strips cross-kind fields from legacy flat-model Log source via SourceSchema.safeParse', async () => {
-      // The external API runs SourceSchema.safeParse() which DOES strip
-      // unknown/cross-kind fields (unlike Mongoose toJSON which keeps them).
-      // This is the key difference between internal and external APIs.
-      await Source.collection.insertOne({
-        kind: SourceKind.Log,
-        name: 'Flat Model Log',
-        team: new mongoose.Types.ObjectId(team._id),
-        connection: connection._id,
-        from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
-        timestampValueExpression: 'Timestamp',
-        defaultTableSelectExpression: 'Body',
-        // Cross-kind fields from old flat model
-        metricTables: { gauge: 'otel_metrics_gauge' },
-        durationExpression: 'Duration',
-      });
-
-      const response = await authRequest('get', BASE_URL).expect(200);
-
-      expect(response.body.data).toHaveLength(1);
-      expect(response.body.data[0].kind).toBe(SourceKind.Log);
-      expect(response.body.data[0].defaultTableSelectExpression).toBe('Body');
-      // Cross-kind fields ARE stripped by SourceSchema.safeParse in the external API
-      expect(response.body.data[0]).not.toHaveProperty('metricTables');
-      expect(response.body.data[0]).not.toHaveProperty('durationExpression');
     });
   });
 });

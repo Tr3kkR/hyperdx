@@ -7,12 +7,12 @@ import {
 import express from 'express';
 import type { Query } from 'mongoose';
 
+import * as connectionsRepo from '@/db/repos/connections';
+import * as sourcesRepo from '@/db/repos/sources';
 import { getNonNullUserWithTeam } from '@/middleware/auth';
 import Alert from '@/models/alert';
-import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import Webhook from '@/models/webhook';
 import { unaddressableTileAlertIds } from '@/utils/iacTileAlerts';
 import { getCounter, withSpan } from '@/utils/instrumentation';
@@ -140,13 +140,24 @@ router.get('/import-manifest', async (req, res, next) => {
           ),
         ).lean(),
         bounded(SavedSearch.find({ team: teamId }, { name: 1 })).lean(),
-        bounded(Source.find({ team: teamId }, { name: 1, kind: 1 })).lean(),
-        bounded(
-          Connection.find(
-            { team: teamId },
-            { name: 1, platformProvisioned: 1 },
-          ),
-        ).lean(),
+        Promise.resolve(
+          sourcesRepo
+            .list(String(teamId))
+            .sort((a, b) => a.id.localeCompare(b.id))
+            .slice(0, IAC_MANIFEST_LIMIT + 1)
+            .map(({ _id, name, kind }) => ({ _id, name, kind })),
+        ),
+        Promise.resolve(
+          connectionsRepo
+            .list(String(teamId))
+            .sort((a, b) => a.id.localeCompare(b.id))
+            .slice(0, IAC_MANIFEST_LIMIT + 1)
+            .map(({ _id, name, platformProvisioned }) => ({
+              _id,
+              name,
+              platformProvisioned,
+            })),
+        ),
         bounded(Webhook.find({ team: teamId }, { name: 1 })).lean(),
       ]);
 

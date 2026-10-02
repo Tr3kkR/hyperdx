@@ -16,6 +16,9 @@ import { ALERT_HISTORY_QUERY_CONCURRENCY } from '@/controllers/alertHistory';
 import { LOCAL_APP_TEAM } from '@/controllers/team';
 import { closeDb, openDb } from '@/db';
 import { migrate } from '@/db/migrate';
+import * as connectionsRepo from '@/db/repos/connections';
+import type { SourceDoc } from '@/db/repos/sources';
+import * as sourcesRepo from '@/db/repos/sources';
 import { pruneExpired } from '@/db/retention';
 import { connectDB, mongooseConnection, ObjectId } from '@/models';
 import Alert, {
@@ -28,10 +31,8 @@ import AlertHistory, {
   IAlertHistory,
   IAlertHistoryAnalytics,
 } from '@/models/alertHistory';
-import Connection, { IConnection } from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { type ISavedSearch, SavedSearch } from '@/models/savedSearch';
-import { type ISource, Source } from '@/models/source';
 import Webhook, { IWebhook } from '@/models/webhook';
 import {
   AggregatedAlertHistory,
@@ -39,6 +40,7 @@ import {
   getPreviousAlertHistories,
 } from '@/tasks/checkAlerts';
 import {
+  type AlertConnection,
   type AlertDetails,
   type AlertProvider,
   type AlertTask,
@@ -52,14 +54,11 @@ type PartialAlertDetails = MappedOmit<AlertDetails, 'previousMap'>;
 
 async function getSavedSearchDetails(
   alert: IAlert,
-): Promise<[IConnection, PartialAlertDetails] | []> {
+): Promise<[AlertConnection, PartialAlertDetails] | []> {
   const savedSearchId = alert.savedSearch;
   const savedSearch = await SavedSearch.findOne({
     _id: savedSearchId,
     team: alert.team,
-  }).populate<Omit<ISavedSearch, 'source'> & { source: ISource }>({
-    path: 'source',
-    match: { team: alert.team },
   });
 
   if (!savedSearch) {
@@ -71,12 +70,13 @@ async function getSavedSearchDetails(
     return [];
   }
 
-  const { source } = savedSearch;
+  const source = sourcesRepo.findById(
+    String(savedSearch.source),
+    String(alert.team),
+  );
+  if (!source) return [];
   const connId = source.connection;
-  const conn = await Connection.findOne({
-    _id: connId,
-    team: alert.team,
-  }).select('+password');
+  const conn = connectionsRepo.findByIdWithPassword(connId, String(alert.team));
   if (!conn) {
     logger.error({
       message: 'connection not found',
@@ -112,14 +112,14 @@ async function getSavedSearchDetails(
 async function getRawSqlSourceMetadata(
   alert: IAlert,
   chartConfig: RawSqlSavedChartConfig,
-): Promise<ISource | undefined> {
+): Promise<SourceDoc | undefined> {
   if (!chartConfig.source) {
     return undefined;
   }
-  const sourceDoc = await Source.findOne({
-    _id: chartConfig.source,
-    team: alert.team,
-  });
+  const sourceDoc = sourcesRepo.findById(
+    chartConfig.source,
+    String(alert.team),
+  );
   if (!sourceDoc) {
     return undefined;
   }
@@ -141,12 +141,12 @@ async function getRawSqlSourceMetadata(
     });
     return undefined;
   }
-  return sourceDoc.toObject();
+  return sourceDoc;
 }
 
 async function getTileDetails(
   alert: IAlert,
-): Promise<[IConnection, PartialAlertDetails] | []> {
+): Promise<[AlertConnection, PartialAlertDetails] | []> {
   const dashboardId = alert.dashboard;
   const tileId = alert.tileId;
 
@@ -187,10 +187,10 @@ async function getTileDetails(
     }
 
     // Raw SQL tiles store connection ID directly on the config
-    const connection = await Connection.findOne({
-      _id: tile.config.connection,
-      team: alert.team,
-    }).select('+password');
+    const connection = connectionsRepo.findByIdWithPassword(
+      tile.config.connection,
+      String(alert.team),
+    );
 
     if (!connection) {
       logger.error({
@@ -218,14 +218,7 @@ async function getTileDetails(
     ];
   }
 
-  const source = await Source.findOne({
-    _id: tile.config.source,
-    team: alert.team,
-  }).populate<Omit<ISource, 'connection'> & { connection: IConnection }>({
-    path: 'connection',
-    match: { team: alert.team },
-    select: '+password',
-  });
+  const source = sourcesRepo.findById(tile.config.source!, String(alert.team));
   if (!source) {
     logger.error({
       message: 'source not found',
@@ -237,7 +230,11 @@ async function getTileDetails(
     return [];
   }
 
-  if (!source.connection) {
+  const connection = connectionsRepo.findByIdWithPassword(
+    source.connection,
+    String(alert.team),
+  );
+  if (!connection) {
     logger.error({
       message: 'connection not found',
       alertId: alert.id,
@@ -248,13 +245,11 @@ async function getTileDetails(
     return [];
   }
 
-  const connection = source.connection;
-  const sourceProps = source.toObject();
   return [
     connection,
     {
       alert,
-      source: { ...sourceProps, connection: connection.id },
+      source,
       taskType: AlertTaskType.TILE,
       tile,
       dashboard,
@@ -264,7 +259,7 @@ async function getTileDetails(
 
 async function getInlineAlertDetails(
   alert: IAlert,
-): Promise<[IConnection, PartialAlertDetails] | []> {
+): Promise<[AlertConnection, PartialAlertDetails] | []> {
   const chartConfig = alert.chartConfig;
   if (chartConfig == null) {
     logger.error({
@@ -285,10 +280,10 @@ async function getInlineAlertDetails(
     }
 
     // Raw SQL configs store the connection ID directly
-    const connection = await Connection.findOne({
-      _id: chartConfig.connection,
-      team: alert.team,
-    }).select('+password');
+    const connection = connectionsRepo.findByIdWithPassword(
+      chartConfig.connection,
+      String(alert.team),
+    );
 
     if (!connection) {
       logger.error({
@@ -313,14 +308,7 @@ async function getInlineAlertDetails(
     ];
   }
 
-  const source = await Source.findOne({
-    _id: chartConfig.source,
-    team: alert.team,
-  }).populate<Omit<ISource, 'connection'> & { connection: IConnection }>({
-    path: 'connection',
-    match: { team: alert.team },
-    select: '+password',
-  });
+  const source = sourcesRepo.findById(chartConfig.source!, String(alert.team));
   if (!source) {
     logger.error({
       message: 'source not found',
@@ -330,7 +318,11 @@ async function getInlineAlertDetails(
     return [];
   }
 
-  if (!source.connection) {
+  const connection = connectionsRepo.findByIdWithPassword(
+    source.connection,
+    String(alert.team),
+  );
+  if (!connection) {
     logger.error({
       message: 'connection not found',
       alertId: alert.id,
@@ -339,13 +331,11 @@ async function getInlineAlertDetails(
     return [];
   }
 
-  const connection = source.connection;
-  const sourceProps = source.toObject();
   return [
     connection,
     {
       alert,
-      source: { ...sourceProps, connection: connection.id },
+      source,
       taskType: AlertTaskType.INLINE,
       chartConfig,
     },
@@ -369,7 +359,7 @@ async function loadAlert(
     alert.team = new mongoose.Types.ObjectId(LOCAL_APP_TEAM.id);
   }
 
-  let conn: IConnection | undefined;
+  let conn: AlertConnection | undefined;
   let details: PartialAlertDetails | undefined;
   switch (alert.source) {
     case AlertSource.SAVED_SEARCH:
@@ -687,7 +677,7 @@ export default class DefaultAlertProvider implements AlertProvider {
   }
 
   async getClickHouseClient(
-    { host, username, password, id }: IConnection,
+    { host, username, password, id }: AlertConnection,
     requestTimeout?: number,
   ): Promise<ClickhouseClient> {
     if (!password && password !== '') {

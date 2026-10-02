@@ -2,6 +2,7 @@ import { MetricsDataType, SourceKind } from '@hyperdx/common-utils/dist/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import * as config from '@/config';
+import * as sourcesRepo from '@/db/repos/sources';
 import * as Team from '@/db/repos/teams';
 import {
   bucketExponentialHistogramObservations,
@@ -18,10 +19,16 @@ import {
   seedExponentialHistogramMetric,
 } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
-import Connection from '@/models/connection';
-import { Source } from '@/models/source';
+import { findSourceFixture } from '@/test/sqliteMetadata';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 import { callTool, createTestClient, getFirstText } from './mcpTestUtils';
+
+const sourceField = (source: object | null, key: string): unknown =>
+  source == null ? undefined : Reflect.get(source, key);
 
 describe('MCP Source Tools', () => {
   const server = getServer();
@@ -41,7 +48,7 @@ describe('MCP Source Tools', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -49,7 +56,7 @@ describe('MCP Source Tools', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    traceSource = await Source.create({
+    traceSource = await createSourceFixture({
       kind: SourceKind.Trace,
       team: team._id,
       from: {
@@ -69,7 +76,7 @@ describe('MCP Source Tools', () => {
       serviceNameExpression: 'ServiceName',
     });
 
-    logSource = await Source.create({
+    logSource = await createSourceFixture({
       kind: SourceKind.Log,
       team: team._id,
       from: {
@@ -191,7 +198,7 @@ describe('MCP Source Tools', () => {
 
     describe('metric-name previews', () => {
       const createMetricSource = (name = 'Metrics') =>
-        Source.create({
+        createSourceFixture({
           kind: SourceKind.Metric,
           team: team._id,
           from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -275,7 +282,7 @@ describe('MCP Source Tools', () => {
       });
 
       it('excludes non-queryable summary metrics from metricNamesPreview', async () => {
-        const metricSource = await Source.create({
+        const metricSource = await createSourceFixture({
           kind: SourceKind.Metric,
           team: team._id,
           from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -444,7 +451,7 @@ describe('MCP Source Tools', () => {
     });
 
     it('should return metricTables AND column schema for a metric source', async () => {
-      const metricSource = await Source.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: {
@@ -505,7 +512,7 @@ describe('MCP Source Tools', () => {
     });
 
     it('discovers and describes exponential histogram metrics', async () => {
-      const metricSource = await Source.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -589,7 +596,7 @@ describe('MCP Source Tools', () => {
       // Summary metrics are discoverable (list/describe) but not queryable:
       // the query renderer has no summary translation, so every discovery
       // surface must redirect the agent to clickstack_sql.
-      const metricSource = await Source.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -702,14 +709,14 @@ describe('MCP Source Tools', () => {
 
     it('should not allow access to another team source', async () => {
       const otherTeam = await Team.create({ name: 'Other Team' });
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: otherTeam._id,
         name: 'Other Connection',
         host: config.CLICKHOUSE_HOST,
         username: config.CLICKHOUSE_USER,
         password: config.CLICKHOUSE_PASSWORD,
       });
-      const otherSource = await Source.create({
+      const otherSource = await createSourceFixture({
         kind: SourceKind.Trace,
         team: otherTeam._id,
         from: {
@@ -734,7 +741,7 @@ describe('MCP Source Tools', () => {
 
   describe('clickstack_list_metrics', () => {
     const createMetricSource = () =>
-      Source.create({
+      createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -921,7 +928,7 @@ describe('MCP Source Tools', () => {
       // Point the gauge kind at the logs table: it exists (so source
       // resolution succeeds) but has no MetricName/TimeUnix columns, so
       // the per-kind listing query throws.
-      const brokenSource = await Source.create({
+      const brokenSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -951,7 +958,7 @@ describe('MCP Source Tools', () => {
 
   describe('clickstack_describe_metric', () => {
     const createMetricSource = () =>
-      Source.create({
+      createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -1008,7 +1015,7 @@ describe('MCP Source Tools', () => {
       // Point the gauge kind at the logs table: it exists (so getColumns
       // succeeds) but lacks MetricName/TimeUnix columns, so the
       // attribute-keys discovery query throws.
-      const brokenSource = await Source.create({
+      const brokenSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -1218,7 +1225,7 @@ describe('MCP Source Tools', () => {
 
     it('rejects explicit kind when the source has no table for that kind', async () => {
       // Source with only gauge populated.
-      const gaugeOnly = await Source.create({
+      const gaugeOnly = await createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -1262,7 +1269,7 @@ describe('MCP Source Tools', () => {
       });
       expect(output.id).toBeDefined();
 
-      const stored = await Source.findById(output.id);
+      const stored = await findSourceFixture(output.id);
       expect(stored).not.toBeNull();
       expect(stored?.team.toString()).toBe(team._id.toString());
       expect(stored?.kind).toBe(SourceKind.Log);
@@ -1291,7 +1298,7 @@ describe('MCP Source Tools', () => {
     it('round-trips a full source config through describe -> save (faithful clone incl. correlation IDs)', async () => {
       // A trace source carrying the fields the curated summary omits:
       // correlation IDs + parent/span-kind/status-message + default select.
-      const original = await Source.create({
+      const original = await createSourceFixture({
         kind: SourceKind.Trace,
         team: team._id,
         from: {
@@ -1369,18 +1376,24 @@ describe('MCP Source Tools', () => {
 
       // 3. the clone carries over every previously-invisible field, including
       //    the advanced ones, and the nested subdoc is stored faithfully.
-      const stored = await Source.findById(clone.id);
-      expect(stored?.get('logSourceId')?.toString()).toBe(
+      const stored = await findSourceFixture(clone.id);
+      expect(String(sourceField(stored, 'logSourceId'))).toBe(
         logSource._id.toString(),
       );
-      expect(stored?.get('parentSpanIdExpression')).toBe('ParentSpanId');
-      expect(stored?.get('spanKindExpression')).toBe('SpanKind');
-      expect(stored?.get('statusMessageExpression')).toBe('StatusMessage');
-      expect(stored?.get('defaultTableSelectExpression')).toBe(
+      expect(sourceField(stored, 'parentSpanIdExpression')).toBe(
+        'ParentSpanId',
+      );
+      expect(sourceField(stored, 'spanKindExpression')).toBe('SpanKind');
+      expect(sourceField(stored, 'statusMessageExpression')).toBe(
+        'StatusMessage',
+      );
+      expect(sourceField(stored, 'defaultTableSelectExpression')).toBe(
         'Timestamp, SpanName, ServiceName',
       );
-      expect(stored?.get('useTextIndexForImplicitColumn')).toBe('enabled');
-      expect(stored?.get('sampleRateExpression')).toBe('SampleRate');
+      expect(sourceField(stored, 'useTextIndexForImplicitColumn')).toBe(
+        'enabled',
+      );
+      expect(sourceField(stored, 'sampleRateExpression')).toBe('SampleRate');
 
       // 4. describe the clone: advanced config round-trips identically.
       const describedClone = await callTool(
@@ -1429,7 +1442,7 @@ describe('MCP Source Tools', () => {
 
     it('rejects a connection owned by another team', async () => {
       const otherTeam = await Team.create({ name: 'Other Team' });
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: otherTeam._id,
         name: 'Other',
         host: config.CLICKHOUSE_HOST,
@@ -1450,14 +1463,15 @@ describe('MCP Source Tools', () => {
       expect(result.isError).toBe(true);
       expect(getFirstText(result)).toContain('existing connection');
 
-      const created = await Source.findOne({ name: 'Cross Team' });
-      expect(created).toBeNull();
+      expect(
+        sourcesRepo.list().find(s => s.name === 'Cross Team'),
+      ).toBeUndefined();
     });
   });
 
   describe('clickstack_save_source (update)', () => {
     it('preserves minAutoGranularity through a describe -> rename -> save round trip', async () => {
-      const created = await Source.create({
+      const created = await createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },
@@ -1487,13 +1501,13 @@ describe('MCP Source Tools', () => {
       });
       expect(result.isError).toBeFalsy();
 
-      const stored = await Source.findById(created._id);
+      const stored = await findSourceFixture(created._id);
       expect(stored?.name).toBe('Renamed');
-      expect(stored?.get('minAutoGranularity')).toBe('1 minute');
+      expect(sourceField(stored, 'minAutoGranularity')).toBe('1 minute');
     });
 
     it('updates an existing log source (full replace)', async () => {
-      const created = await Source.create({
+      const created = await createSourceFixture({
         kind: SourceKind.Log,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
@@ -1519,13 +1533,13 @@ describe('MCP Source Tools', () => {
       expect(output.id).toBe(created._id.toString());
       expect(output.name).toBe('Updated Name');
 
-      const stored = await Source.findById(created._id);
+      const stored = await findSourceFixture(created._id);
       expect(stored?.name).toBe('Updated Name');
       // Regression: findOneAndReplace replaces the whole doc, so team must be
       // preserved — otherwise the source becomes invisible to team-scoped
       // queries (and undeletable).
       expect(stored?.team.toString()).toBe(team._id.toString());
-      const listing = await Source.find({ team: team._id });
+      const listing = sourcesRepo.list(String(team._id));
       expect(
         listing.some(s => s._id.toString() === created._id.toString()),
       ).toBe(true);
@@ -1564,7 +1578,7 @@ describe('MCP Source Tools', () => {
     });
 
     it('updates a source across a kind change (raw replaceOne path) and keeps it team-scoped', async () => {
-      const created = await Source.create({
+      const created = await createSourceFixture({
         kind: SourceKind.Log,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
@@ -1598,17 +1612,17 @@ describe('MCP Source Tools', () => {
 
       // The raw replaceOne path preserves _id/team/connection; verify the row
       // is still team-scoped-visible and the kind actually flipped.
-      const stored = await Source.findById(created._id);
+      const stored = await findSourceFixture(created._id);
       expect(stored?.kind).toBe(SourceKind.Trace);
       expect(stored?.team.toString()).toBe(team._id.toString());
-      const listing = await Source.find({ team: team._id });
+      const listing = sourcesRepo.list(String(team._id));
       expect(
         listing.some(s => s._id.toString() === created._id.toString()),
       ).toBe(true);
     });
 
     it('full-replaces optional fields on update (omitted => cleared, present => stored)', async () => {
-      const created = await Source.create({
+      const created = await createSourceFixture({
         kind: SourceKind.Log,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
@@ -1634,14 +1648,14 @@ describe('MCP Source Tools', () => {
       });
 
       expect(result.isError).toBeFalsy();
-      const stored = await Source.findById(created._id);
-      expect(stored?.get('bodyExpression')).toBe('Body2');
+      const stored = await findSourceFixture(created._id);
+      expect(sourceField(stored, 'bodyExpression')).toBe('Body2');
       // Omitted optional field is cleared by the full replace.
-      expect(stored?.get('serviceNameExpression') == null).toBe(true);
+      expect(sourceField(stored, 'serviceNameExpression') == null).toBe(true);
     });
 
     it('rejects an update that references another team\u2019s correlated source', async () => {
-      const created = await Source.create({
+      const created = await createSourceFixture({
         kind: SourceKind.Trace,
         team: team._id,
         from: {
@@ -1661,14 +1675,14 @@ describe('MCP Source Tools', () => {
       });
 
       const otherTeam = await Team.create({ name: 'Other Team 3' });
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: otherTeam._id,
         name: 'Other 3',
         host: config.CLICKHOUSE_HOST,
         username: config.CLICKHOUSE_USER,
         password: config.CLICKHOUSE_PASSWORD,
       });
-      const otherLogSource = await Source.create({
+      const otherLogSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: otherTeam._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
@@ -1703,7 +1717,7 @@ describe('MCP Source Tools', () => {
 
   describe('clickstack_delete_source', () => {
     it('deletes a source', async () => {
-      const created = await Source.create({
+      const created = await createSourceFixture({
         kind: SourceKind.Log,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
@@ -1724,7 +1738,7 @@ describe('MCP Source Tools', () => {
         id: created._id.toString(),
       });
 
-      expect(await Source.findById(created._id)).toBeNull();
+      expect(await findSourceFixture(created._id)).toBeNull();
     });
 
     it('returns a user error for a non-existent id', async () => {
@@ -1738,14 +1752,14 @@ describe('MCP Source Tools', () => {
 
     it('does not delete a source owned by another team', async () => {
       const otherTeam = await Team.create({ name: 'Other Team 2' });
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: otherTeam._id,
         name: 'Other 2',
         host: config.CLICKHOUSE_HOST,
         username: config.CLICKHOUSE_USER,
         password: config.CLICKHOUSE_PASSWORD,
       });
-      const otherSource = await Source.create({
+      const otherSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: otherTeam._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
@@ -1762,7 +1776,7 @@ describe('MCP Source Tools', () => {
       expect(result.isError).toBe(true);
       expect(getFirstText(result)).toContain('not found');
       // Still present.
-      expect(await Source.findById(otherSource._id)).not.toBeNull();
+      expect(await findSourceFixture(otherSource._id)).not.toBeNull();
     });
   });
 });

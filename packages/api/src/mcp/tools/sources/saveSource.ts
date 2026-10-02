@@ -138,7 +138,7 @@ async function validateCorrelatedSourceIds(
 }
 
 function sourceResult(
-  source: { toJSON(opts: { getters: boolean }): unknown } | null | undefined,
+  source: Record<string, unknown> | null | undefined,
   frontendUrl: string | undefined,
 ) {
   return {
@@ -147,7 +147,7 @@ function sourceResult(
         type: 'text' as const,
         text: JSON.stringify(
           {
-            ...(source?.toJSON({ getters: true }) as Record<string, unknown>),
+            ...source,
             ...(frontendUrl ? { url: `${frontendUrl}/team#sources` } : {}),
           },
           null,

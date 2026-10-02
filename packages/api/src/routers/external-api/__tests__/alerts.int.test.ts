@@ -11,11 +11,13 @@ import {
 } from '@/fixtures';
 import { AlertSource, AlertThresholdType } from '@/models/alert';
 import Alert from '@/models/alert';
-import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import Webhook, { WebhookService } from '@/models/webhook';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 // Constants
 const ALERTS_BASE_URL = '/api/v2/alerts';
@@ -938,14 +940,14 @@ describe('External API Alerts', () => {
   describe('Inline alerts', () => {
     // Team-scoped connection + source the inline chart configs reference.
     const makeSource = async () => {
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Default',
         host: 'http://localhost:8123',
         username: 'default',
         password: '',
       });
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: SourceKind.Log,
         team: team._id,
         from: { databaseName: 'default', tableName: 'otel_logs' },
@@ -1476,7 +1478,7 @@ describe('External API Alerts', () => {
     it('rejects a raw SQL inline alert whose source is on a different connection', async () => {
       const { connection, source } = await makeSource();
       const webhook = await createTestWebhook();
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: team._id,
         name: 'Other',
         host: 'http://localhost:8124',
@@ -1588,7 +1590,7 @@ describe('External API Alerts', () => {
       const { connection, source } = await makeSource();
       const webhook = await createTestWebhook();
 
-      const sessionSource = await Source.create({
+      const sessionSource = await createSourceFixture({
         kind: SourceKind.Session,
         team: team._id,
         from: { databaseName: 'default', tableName: 'rrweb_events' },

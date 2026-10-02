@@ -13,10 +13,8 @@ import {
 } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
 import AlertHistory from '@/models/alertHistory';
-import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import Webhook from '@/models/webhook';
 import { processAlert } from '@/tasks/checkAlerts';
 import {
@@ -24,6 +22,10 @@ import {
   AlertTaskType,
   loadProvider,
 } from '@/tasks/checkAlerts/providers';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 import * as slack from '@/utils/slack';
 
 describe('Single Invocation Alert Test', () => {
@@ -99,7 +101,7 @@ describe('Single Invocation Alert Test', () => {
     const team = await createTeam({ name: 'Test Team' });
 
     // Create connection to ClickHouse
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Test Connection',
       host: config.CLICKHOUSE_HOST,
@@ -108,7 +110,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create source
-    const source = await Source.create({
+    const source = await createSourceFixture({
       kind: 'log',
       team: team._id,
       from: {
@@ -259,7 +261,7 @@ describe('Single Invocation Alert Test', () => {
 
     const team = await createTeam({ name: 'Test Team' });
 
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Test Connection',
       host: config.CLICKHOUSE_HOST,
@@ -267,7 +269,7 @@ describe('Single Invocation Alert Test', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    const source = await Source.create({
+    const source = await createSourceFixture({
       kind: 'log',
       team: team._id,
       from: {
@@ -399,7 +401,7 @@ describe('Single Invocation Alert Test', () => {
 
     const team = await createTeam({ name: 'Test Team' });
 
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Test Connection',
       host: config.CLICKHOUSE_HOST,
@@ -407,7 +409,7 @@ describe('Single Invocation Alert Test', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    const source = await Source.create({
+    const source = await createSourceFixture({
       kind: 'log',
       team: team._id,
       from: {
@@ -520,7 +522,7 @@ describe('Single Invocation Alert Test', () => {
 
     const team = await createTeam({ name: 'Test Team' });
 
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Test Connection',
       host: config.CLICKHOUSE_HOST,
@@ -528,7 +530,7 @@ describe('Single Invocation Alert Test', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    const source = await Source.create({
+    const source = await createSourceFixture({
       kind: 'log',
       team: team._id,
       from: {
@@ -685,7 +687,7 @@ describe('Single Invocation Alert Test', () => {
     ]);
 
     // Create connection
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Test Connection',
       host: config.CLICKHOUSE_HOST,
@@ -694,7 +696,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create source
-    const source = await Source.create({
+    const source = await createSourceFixture({
       kind: 'log',
       team: team._id,
       from: {
@@ -863,7 +865,7 @@ describe('Single Invocation Alert Test', () => {
 
     const team = await createTeam({ name: 'Test Team' });
 
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Test Connection',
       host: config.CLICKHOUSE_HOST,

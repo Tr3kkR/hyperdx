@@ -11,6 +11,8 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 
 import { recordOnboardingTaskCompletion } from '@/controllers/user';
+import * as connectionsRepo from '@/db/repos/connections';
+import * as sourcesRepo from '@/db/repos/sources';
 import type { UserDoc as IUser } from '@/db/repos/users';
 import { hydrateUsers } from '@/db/repos/users';
 import type { ObjectId } from '@/models';
@@ -20,10 +22,8 @@ import Alert, {
   getAlertChannels,
   IAlert,
 } from '@/models/alert';
-import Connection from '@/models/connection';
 import Dashboard, { IDashboard } from '@/models/dashboard';
 import { ISavedSearch, SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import Webhook from '@/models/webhook';
 import { type AlertRefs, deriveAlertDisplayFields } from '@/utils/alerts';
 import { Api400Error } from '@/utils/errors';
@@ -145,19 +145,19 @@ export const validateAlertInput = async (
       // Raw SQL configs carry the connection directly; the source reference
       // is optional metadata for macro expansion ($__sourceTable).
       validateObjectId(chartConfig.connection, 'Invalid connection ID');
-      const connection = await Connection.findOne({
-        _id: chartConfig.connection,
-        team: teamId,
-      });
+      const connection = connectionsRepo.findById(
+        chartConfig.connection,
+        teamId.toString(),
+      );
       if (connection == null) {
         throw new Api400Error('Connection not found');
       }
       if (chartConfig.source) {
         validateObjectId(chartConfig.source, 'Invalid source ID');
-        const source = await Source.findOne({
-          _id: chartConfig.source,
-          team: teamId,
-        });
+        const source = sourcesRepo.findById(
+          chartConfig.source,
+          teamId.toString(),
+        );
         if (source == null) {
           throw new Api400Error('Source not found');
         }
@@ -191,10 +191,10 @@ export const validateAlertInput = async (
       }
 
       validateObjectId(chartConfig.source, 'Invalid source ID');
-      const source = await Source.findOne({
-        _id: chartConfig.source,
-        team: teamId,
-      });
+      const source = sourcesRepo.findById(
+        chartConfig.source!,
+        teamId.toString(),
+      );
       if (source == null) {
         throw new Api400Error('Source not found');
       }

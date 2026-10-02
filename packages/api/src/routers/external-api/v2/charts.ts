@@ -1,5 +1,6 @@
 import { getMetadata } from '@hyperdx/common-utils/dist/core/metadata';
 import { Granularity } from '@hyperdx/common-utils/dist/core/utils';
+import type { TSource } from '@hyperdx/common-utils/dist/types';
 import {
   ChartConfigWithOptDateRange,
   DisplayType,
@@ -14,8 +15,7 @@ import { ClickhouseClient } from '@/clickhouse';
 import { getConnectionById } from '@/controllers/connection';
 import { getSource } from '@/controllers/sources';
 import { getTeam } from '@/controllers/team';
-import { IConnection } from '@/models/connection';
-import { ISource } from '@/models/source';
+import type { ConnectionDoc } from '@/db/repos/connections';
 import { validateRequestWithEnhancedErrors as validateRequest } from '@/utils/enhancedErrors';
 import {
   getCounter,
@@ -224,8 +224,8 @@ const buildChartConfigFromRequest = async (
     seriesReturnType?: 'ratio' | 'column';
     teamId: string;
   },
-  source: ISource,
-  connection: IConnection,
+  source: TSource,
+  connection: ConnectionDoc,
 ): Promise<{
   chartConfig: ChartConfigWithOptDateRange;
   groupByFields: string[] | undefined;

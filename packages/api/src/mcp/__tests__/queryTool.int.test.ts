@@ -3,6 +3,7 @@ import { MetricsDataType, SourceKind } from '@hyperdx/common-utils/dist/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import * as config from '@/config';
+import type { SourceDoc } from '@/db/repos/sources';
 import {
   bucketExponentialHistogramObservations,
   bulkInsertLogs,
@@ -18,8 +19,10 @@ import {
   seedExponentialHistogramMetric,
 } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
-import Connection from '@/models/connection';
-import { Source, type SourceDocument } from '@/models/source';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 import { callTool, createTestClient, getFirstText } from './mcpTestUtils';
 
@@ -27,8 +30,8 @@ describe('MCP Query Tools', () => {
   const server = getServer();
   let team: any;
   let user: any;
-  let traceSource: SourceDocument;
-  let logSource: SourceDocument;
+  let traceSource: SourceDoc;
+  let logSource: SourceDoc;
   let connection: any;
   let client: Client;
 
@@ -41,7 +44,7 @@ describe('MCP Query Tools', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -49,7 +52,7 @@ describe('MCP Query Tools', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    traceSource = await Source.create({
+    traceSource = await createSourceFixture({
       kind: SourceKind.Trace,
       team: team._id,
       from: {
@@ -61,7 +64,7 @@ describe('MCP Query Tools', () => {
       name: 'Traces',
     });
 
-    logSource = await Source.create({
+    logSource = await createSourceFixture({
       kind: SourceKind.Log,
       team: team._id,
       from: {
@@ -837,10 +840,10 @@ describe('MCP Query Tools', () => {
 
     describe('infrastructure errors (unreachable ClickHouse)', () => {
       let deadConnection: any;
-      let deadSource: SourceDocument;
+      let deadSource: SourceDoc;
 
       beforeEach(async () => {
-        deadConnection = await Connection.create({
+        deadConnection = await createConnectionFixture({
           team: team._id,
           name: 'Dead',
           host: 'http://localhost:1',
@@ -848,7 +851,7 @@ describe('MCP Query Tools', () => {
           password: '',
         });
 
-        deadSource = await Source.create({
+        deadSource = await createSourceFixture({
           kind: SourceKind.Trace,
           team: team._id,
           from: {
@@ -1011,7 +1014,7 @@ describe('MCP Query Tools', () => {
 
   describe('Metric sources (timeseries + table)', () => {
     const createMetricSource = () =>
-      Source.create({
+      createSourceFixture({
         kind: SourceKind.Metric,
         team: team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },

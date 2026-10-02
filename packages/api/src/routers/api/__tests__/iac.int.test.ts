@@ -8,11 +8,13 @@ import {
   randomMongoId,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
-import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import Webhook from '@/models/webhook';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 describe('iac router', () => {
   const server = getServer();
@@ -176,14 +178,14 @@ describe('iac router', () => {
   it('maps every resource type, not just dashboards', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Local ClickHouse',
       host: 'http://localhost:8123',
       username: 'default',
     });
 
-    const source = await Source.create({
+    const source = await createSourceFixture({
       kind: SourceKind.Log,
       name: 'Logs',
       team: team._id,
@@ -395,7 +397,7 @@ describe('iac router', () => {
   it('surfaces an explicit platformProvisioned marker on a connection', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    await Connection.create({
+    await createConnectionFixture({
       team: team._id,
       name: 'Cloud ClickHouse',
       host: 'https://abc.clickhouse.cloud:8443',
@@ -443,7 +445,7 @@ describe('iac router', () => {
   it('ignores a client-supplied platformProvisioned flag on connection update', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Cloud ClickHouse',
       host: 'https://abc.clickhouse.cloud:8443',
@@ -486,7 +488,7 @@ describe('iac router', () => {
       state: AlertState.OK,
       channel: { type: null },
     });
-    await Connection.create({
+    await createConnectionFixture({
       team: otherTeam,
       name: "Other team's connection",
       host: 'http://elsewhere:8123',

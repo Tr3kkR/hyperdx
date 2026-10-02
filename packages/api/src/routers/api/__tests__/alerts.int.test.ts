@@ -22,11 +22,13 @@ import {
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
 import AlertHistory from '@/models/alertHistory';
-import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 const MOCK_TILES = [makeTile(), makeTile(), makeTile(), makeTile(), makeTile()];
 
@@ -487,7 +489,7 @@ describe('alerts router', () => {
   });
 
   it('derives displayName from the chart config for inline alerts', async () => {
-    const source = await Source.create({
+    const source = await createSourceFixture({
       kind: SourceKind.Log,
       team: team._id,
       from: { databaseName: 'default', tableName: 'otel_logs' },
@@ -1906,14 +1908,14 @@ describe('alerts router', () => {
 
   describe('inline alerts', () => {
     const makeSource = async () => {
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Default',
         host: 'http://localhost:8123',
         username: 'default',
         password: '',
       });
-      const source = await Source.create({
+      const source = await createSourceFixture({
         kind: SourceKind.Log,
         team: team._id,
         from: { databaseName: 'default', tableName: 'otel_logs' },
@@ -2144,7 +2146,7 @@ describe('alerts router', () => {
 
     it('rejects a raw SQL inline alert whose source is on a different connection', async () => {
       const { connection, source } = await makeSource();
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: team._id,
         name: 'Other',
         host: 'http://localhost:8124',

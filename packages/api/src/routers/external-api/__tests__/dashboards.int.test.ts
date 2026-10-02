@@ -19,10 +19,13 @@ import {
   makeExternalTile,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
-import { Source } from '@/models/source';
 import Webhook, { WebhookService } from '@/models/webhook';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+  setSourceKindFixture,
+} from '@/test/sqliteMetadata';
 import {
   ExternalDashboardTile,
   ExternalDashboardTileWithId,
@@ -161,7 +164,7 @@ describe('External API v2 Dashboards - old format', () => {
     team = result.team;
     user = result.user;
 
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -169,7 +172,7 @@ describe('External API v2 Dashboards - old format', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    traceSource = await Source.create({
+    traceSource = await createSourceFixture({
       kind: SourceKind.Trace,
       team: team._id,
       from: {
@@ -181,7 +184,7 @@ describe('External API v2 Dashboards - old format', () => {
       name: 'Traces',
     });
 
-    metricSource = await Source.create({
+    metricSource = await createSourceFixture({
       kind: SourceKind.Metric,
       team: team._id,
       from: {
@@ -1927,7 +1930,7 @@ describe('External API v2 Dashboards - new format', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -1935,7 +1938,7 @@ describe('External API v2 Dashboards - new format', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    traceSource = await Source.create({
+    traceSource = await createSourceFixture({
       kind: SourceKind.Trace,
       team: team._id,
       from: {
@@ -1947,7 +1950,7 @@ describe('External API v2 Dashboards - new format', () => {
       name: 'Traces',
     });
 
-    metricSource = await Source.create({
+    metricSource = await createSourceFixture({
       kind: SourceKind.Metric,
       team: team._id,
       from: {
@@ -1964,7 +1967,7 @@ describe('External API v2 Dashboards - new format', () => {
       name: 'Metrics',
     });
 
-    promqlSource = await Source.create({
+    promqlSource = await createSourceFixture({
       kind: SourceKind.Promql,
       team: team._id,
       from: {
@@ -3274,7 +3277,7 @@ describe('External API v2 Dashboards - new format', () => {
     });
 
     it('should return 400 when connection ID does not belong to the team', async () => {
-      const otherTeamConnection = await Connection.create({
+      const otherTeamConnection = await createConnectionFixture({
         team: new ObjectId(),
         name: 'Other Team Connection',
         host: config.CLICKHOUSE_HOST,
@@ -3311,7 +3314,7 @@ describe('External API v2 Dashboards - new format', () => {
     });
 
     it('should return 400 when source connection does not match tile connection', async () => {
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: team._id,
         name: 'Other Connection',
         host: config.CLICKHOUSE_HOST,
@@ -4917,7 +4920,7 @@ describe('External API v2 Dashboards - new format', () => {
 
     it('should return 400 when connection ID does not belong to the team', async () => {
       const dashboard = await createTestDashboard();
-      const otherTeamConnection = await Connection.create({
+      const otherTeamConnection = await createConnectionFixture({
         team: new ObjectId(),
         name: 'Other Team Connection',
         host: config.CLICKHOUSE_HOST,
@@ -4956,7 +4959,7 @@ describe('External API v2 Dashboards - new format', () => {
 
     it('should return 400 when source connection does not match tile connection', async () => {
       const dashboard = await createTestDashboard();
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: team._id,
         name: 'Other Connection',
         host: config.CLICKHOUSE_HOST,
@@ -5310,10 +5313,7 @@ describe('External API v2 Dashboards - new format', () => {
       // schema diffs. The behaviour we care about is that subsequent
       // PUTs on the dashboard don't wedge on the now-incompatible
       // source as long as the heatmap tile itself was not changed.
-      await Source.collection.updateOne(
-        { _id: traceSource._id },
-        { $set: { kind: SourceKind.Log } },
-      );
+      setSourceKindFixture(traceSource._id, SourceKind.Log);
 
       // PUT the dashboard back with the heatmap tile unchanged but a
       // different non-heatmap tile edit. Should still succeed.
@@ -6798,7 +6798,7 @@ describe('External API v2 Dashboards - new format', () => {
     });
 
     it('rejects formulas on a formula-incapable source kind (session)', async () => {
-      const sessionSource = await Source.create({
+      const sessionSource = await createSourceFixture({
         kind: SourceKind.Session,
         team: team._id,
         from: {
@@ -6839,10 +6839,7 @@ describe('External API v2 Dashboards - new format', () => {
       // `kind` is the Mongoose discriminator key, which updateOne silently
       // strips from $set — write through the raw collection instead, the
       // same way a source-replace API call would leave the doc.
-      await Source.collection.updateOne(
-        { _id: metricSource._id },
-        { $set: { kind: SourceKind.Session } },
-      );
+      setSourceKindFixture(metricSource._id, SourceKind.Session);
 
       // Unrelated edit (rename) resubmitting the unchanged tile: accepted.
       await authRequest('put', `${BASE_URL}/${dashboardId}`)

@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 import { DEFAULT_DATABASE } from '@/fixtures';
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
 import Dashboard from '@/models/dashboard';
-import { Source } from '@/models/source';
+import { createSourceFixture } from '@/test/sqliteMetadata';
 import type { ExternalDashboardTileWithId } from '@/utils/zod';
 
 import { setupDashboardTests } from './setup';
@@ -1076,7 +1076,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       // something to reject. The schema accepts the tile shape (the
       // sourceId is valid), so this exercises the runtime check that
       // the REST POST path also runs.
-      const logSource = await Source.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: ctx.team._id,
         from: {
@@ -1111,7 +1111,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
     // Exercises the update-side source-kind gate via filterChangedHeatmapTiles
     // (displayType changed to heatmap on an existing tile).
     it('should reject update that changes a tile to heatmap on a non-Trace source', async () => {
-      const logSource = await Source.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: ctx.team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: 'otel_logs' },
@@ -1159,7 +1159,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
     // Exercises the update-side source-kind gate via filterChangedHeatmapTiles
     // (sourceId changed on an existing heatmap tile).
     it('should reject update that changes a heatmap tile source to a non-Trace source', async () => {
-      const logSource = await Source.create({
+      const logSource = await createSourceFixture({
         kind: SourceKind.Log,
         team: ctx.team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: 'otel_logs' },
@@ -3313,7 +3313,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       // source must be rejected at save time, matching the REST POST
       // path. Create the metric source inline so this test is
       // self-contained.
-      const metricSource = await Source.create({
+      const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
         team: ctx.team._id,
         from: {
@@ -3503,7 +3503,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
 
   describe('metric tiles', () => {
     const makeMetricSource = () =>
-      Source.create({
+      createSourceFixture({
         kind: SourceKind.Metric,
         team: ctx.team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },

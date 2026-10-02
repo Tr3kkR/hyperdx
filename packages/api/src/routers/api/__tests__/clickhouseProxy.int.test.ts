@@ -1,7 +1,7 @@
 import http from 'http';
 
 import { getLoggedInAgent, getServer } from '@/fixtures';
-import Connection from '@/models/connection';
+import { createConnectionFixture } from '@/test/sqliteMetadata';
 
 // Use the real proxy instead of the blanket mock in jest.setup.ts; the int
 // jest config transpiles it (see jest.int.config.js).
@@ -71,7 +71,7 @@ describe('clickhouse-proxy body forwarding', () => {
   });
 
   const createConnection = async (teamId: string) => {
-    const connection = await Connection.create({
+    const connection = await createConnectionFixture({
       team: teamId,
       name: 'Upstream Echo',
       host: upstreamUrl,

@@ -3,7 +3,7 @@ import { MetricsDataType, SourceKind } from '@hyperdx/common-utils/dist/types';
 import { DEFAULT_DATABASE, DEFAULT_METRICS_TABLE } from '@/fixtures';
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
 import Dashboard from '@/models/dashboard';
-import { Source } from '@/models/source';
+import { createSourceFixture } from '@/test/sqliteMetadata';
 import type { ExternalDashboardTileWithId } from '@/utils/zod';
 
 import { setupDashboardTests } from './setup';
@@ -1176,7 +1176,7 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
     ];
 
     const createMetricSource = () =>
-      Source.create({
+      createSourceFixture({
         kind: SourceKind.Metric,
         team: ctx.team._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: '' },

@@ -9,9 +9,11 @@ import {
   getServer,
 } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
-import Connection from '@/models/connection';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 import { callTool, createTestClient, getFirstText } from './mcpTestUtils';
 
@@ -32,7 +34,7 @@ describe('MCP Saved Search Tools', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -40,7 +42,7 @@ describe('MCP Saved Search Tools', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    traceSource = await Source.create({
+    traceSource = await createSourceFixture({
       kind: SourceKind.Trace,
       team: team._id,
       from: {

@@ -1,10 +1,11 @@
 import { ClickhouseClient } from '@hyperdx/common-utils/dist/clickhouse/node';
+import type { TSource } from '@hyperdx/common-utils/dist/types';
 import mongoose from 'mongoose';
 
 import * as config from '@/config';
 import { ObjectId } from '@/models';
 import { AlertSource, AlertThresholdType, IAlert } from '@/models/alert';
-import { ISource } from '@/models/source';
+type ISource = TSource & { team: string };
 import { IWebhook } from '@/models/webhook';
 import * as checkAlerts from '@/tasks/checkAlerts';
 import CheckAlertTask from '@/tasks/checkAlerts';

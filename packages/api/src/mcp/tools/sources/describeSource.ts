@@ -82,7 +82,7 @@ async function describeSourceSchema(
     timestampColumn: source.timestampValueExpression,
     // Round-trippable config for clickstack_save_source (clone / read-modify-
     // write); includes fields the curated summary below omits.
-    config: extractSourceConfig(source.toObject()),
+    config: extractSourceConfig(source),
   };
 
   if (source.section) {

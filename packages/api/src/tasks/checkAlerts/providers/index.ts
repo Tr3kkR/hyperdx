@@ -1,14 +1,16 @@
 import { ClickhouseClient } from '@hyperdx/common-utils/dist/clickhouse/node';
-import { AlertChartConfig, Tile } from '@hyperdx/common-utils/dist/types';
+import {
+  AlertChartConfig,
+  Tile,
+  type TSource,
+} from '@hyperdx/common-utils/dist/types';
 import _ from 'lodash';
 
 import { ObjectId } from '@/models';
 import { IAlert, IAlertError } from '@/models/alert';
 import { IAlertHistory, IAlertHistoryAnalytics } from '@/models/alertHistory';
-import { IConnection } from '@/models/connection';
 import { IDashboard } from '@/models/dashboard';
 import { ISavedSearch } from '@/models/savedSearch';
-import { ISource } from '@/models/source';
 import { IWebhook } from '@/models/webhook';
 import { AggregatedAlertHistory } from '@/tasks/checkAlerts';
 import DefaultAlertProvider from '@/tasks/checkAlerts/providers/default';
@@ -19,6 +21,15 @@ export enum AlertTaskType {
   TILE,
   INLINE,
 }
+
+export type AlertConnection = {
+  id: string;
+  team: { toString(): string };
+  host: string;
+  username: string;
+  password?: string;
+};
+type AlertSourceDoc = TSource & { team: string };
 
 // Discriminated union of possible alert channel types with populated channel data
 export type PopulatedAlertChannel = { type: 'webhook' } & { channel: IWebhook };
@@ -40,12 +51,12 @@ export type AlertDetails = {
 } & (
   | {
       taskType: AlertTaskType.SAVED_SEARCH;
-      source: ISource;
+      source: AlertSourceDoc;
       savedSearch: Omit<ISavedSearch, 'source'>;
     }
   | {
       taskType: AlertTaskType.TILE;
-      source?: ISource;
+      source?: AlertSourceDoc;
       tile: Tile;
       dashboard: IDashboard;
     }
@@ -54,7 +65,7 @@ export type AlertDetails = {
       // present for builder configs and optional for raw SQL configs (which
       // carry the connection directly).
       taskType: AlertTaskType.INLINE;
-      source?: ISource;
+      source?: AlertSourceDoc;
       chartConfig: AlertChartConfig;
     }
 );
@@ -63,7 +74,7 @@ export type AlertDetails = {
 // them. The `metadata` field is only valid when T is defined to be a legal type.
 export type AlertTask<T = never> = {
   alerts: AlertDetails[];
-  conn: IConnection;
+  conn: AlertConnection;
   now: Date;
 } & ([T] extends [never] ? unknown : { metadata: T });
 
@@ -147,7 +158,7 @@ export interface AlertProvider {
 
   /** Create and return an authenticated ClickHouse client */
   getClickHouseClient(
-    connection: IConnection,
+    connection: AlertConnection,
     requestTimeout?: number,
   ): Promise<ClickhouseClient>;
 }
