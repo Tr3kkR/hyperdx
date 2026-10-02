@@ -9,7 +9,7 @@ import {
   findUserByEmail,
   findUsersByTeam,
 } from '@/controllers/user';
-import TeamInvite from '@/models/teamInvite';
+import * as teamInvites from '@/db/repos/teamInvites';
 import { objectIdSchema } from '@/utils/zod';
 
 const router = express.Router();
@@ -125,33 +125,12 @@ router.post(
         });
       }
 
-      let teamInvite = await TeamInvite.findOne({
-        teamId: teamId.toString(),
+      const teamInvite = teamInvites.createIfAbsent({
+        teamId: String(teamId),
+        name,
         email: normalizedEmail,
+        token: crypto.randomBytes(32).toString('hex'),
       });
-
-      if (!teamInvite) {
-        try {
-          teamInvite = await new TeamInvite({
-            teamId: teamId.toString(),
-            name,
-            email: normalizedEmail,
-            token: crypto.randomBytes(32).toString('hex'),
-          }).save();
-        } catch (err: any) {
-          // ponytail: concurrent insert lost the race on the {teamId, email}
-          // unique index — re-fetch the winner's doc to stay idempotent.
-          if (err?.code === 11000) {
-            teamInvite = await TeamInvite.findOne({
-              teamId: teamId.toString(),
-              email: normalizedEmail,
-            });
-          }
-          if (!teamInvite) {
-            throw err;
-          }
-        }
-      }
 
       return res.json({
         data: {
@@ -186,13 +165,10 @@ router.get('/invitations', async (req, res, next) => {
       return res.sendStatus(403);
     }
 
-    const teamInvites = await TeamInvite.find(
-      { teamId: teamId.toString() },
-      { createdAt: 1, email: 1, name: 1, token: 1 },
-    );
+    const invites = teamInvites.listByTeam(String(teamId));
 
     return res.json({
-      data: teamInvites.map(ti => ({
+      data: invites.map(ti => ({
         id: ti._id.toString(),
         createdAt: ti.createdAt,
         email: ti.email,
@@ -235,10 +211,7 @@ router.delete(
         return res.sendStatus(403);
       }
 
-      const teamInvite = await TeamInvite.findOneAndDelete({
-        _id: req.params.id,
-        teamId: teamId.toString(),
-      });
+      const teamInvite = teamInvites.deleteById(req.params.id, String(teamId));
 
       if (!teamInvite) {
         return res.sendStatus(404);

@@ -8,10 +8,10 @@ import * as config from '@/config';
 import { isTeamExisting } from '@/controllers/team';
 import { withTransaction } from '@/db';
 import { hashPassword } from '@/db/password';
+import * as teamInvites from '@/db/repos/teamInvites';
 import * as teams from '@/db/repos/teams';
 import * as users from '@/db/repos/users';
 import { handleAuthError, redirectToDashboard } from '@/middleware/auth';
-import TeamInvite from '@/models/teamInvite';
 import { setupTeamDefaults } from '@/setupDefaults';
 import logger from '@/utils/logger';
 import passport from '@/utils/passport';
@@ -166,30 +166,31 @@ router.post('/team/setup/:token', async (req, res, next) => {
       );
     }
 
-    const teamInvite = await TeamInvite.findOne({
-      token: req.params.token,
-    });
+    const teamInvite = teamInvites.findByToken(req.params.token);
     if (!teamInvite) {
       return res.status(401).send('Invalid token');
     }
 
     let user;
     try {
-      user = await users.createWithPassword(
-        {
+      const credentials = await hashPassword(password);
+      user = withTransaction(() => {
+        // sqlite-port: User.register plus TeamInvite.findByIdAndRemove is atomic.
+        const created = users.create({
           email: teamInvite.email,
           name: teamInvite.email,
-          team: String(teamInvite.teamId),
-        },
-        password,
-      );
+          team: teamInvite.teamId,
+          ...credentials,
+        });
+        teamInvites.deleteById(teamInvite._id);
+        return created;
+      });
     } catch (err) {
       logger.error({ err: serializeError(err) }, 'Team setup error');
       return res.redirect(
         `${config.FRONTEND_REDIRECT_BASE}/join-team?token=${token}&err=500`,
       );
     }
-    await TeamInvite.findByIdAndRemove(teamInvite._id);
     req.login(user, err => {
       if (err) return next(err);
       redirectToDashboard(req, res);

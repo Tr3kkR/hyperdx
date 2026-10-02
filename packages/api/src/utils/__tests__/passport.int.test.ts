@@ -1,6 +1,6 @@
+import * as teamInvites from '@/db/repos/teamInvites';
 import * as users from '@/db/repos/users';
 import { getAgent, getLoggedInAgent, getServer } from '@/fixtures';
-import TeamInvite from '@/models/teamInvite';
 
 const MEMBER_EMAIL = 'removed-member@example.com';
 // Repeats the password from `MOCK_USER` in fixtures.ts, which is not exported.
@@ -23,7 +23,7 @@ describe('passport session deserialization', () => {
   });
 
   const findInvite = async () => {
-    const invite = await TeamInvite.findOne({ email: MEMBER_EMAIL });
+    const invite = teamInvites.findByEmail(MEMBER_EMAIL);
     if (invite == null) {
       throw new Error('TeamInvite not found');
     }
@@ -89,6 +89,6 @@ describe('passport session deserialization', () => {
       .expect(303);
 
     expect(users.findByEmail(MEMBER_EMAIL)).not.toBeNull();
-    expect(await TeamInvite.findById(invite._id)).toBeNull();
+    expect(teamInvites.findById(invite._id)).toBeNull();
   });
 });
