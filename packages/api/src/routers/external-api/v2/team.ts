@@ -77,7 +77,7 @@ router.get('/members', async (req, res, next) => {
         id: user._id.toString(),
         email: user.email,
         name: user.name,
-        isCurrentUser: !!userId && user._id.equals(userId),
+        isCurrentUser: !!userId && user._id === String(userId),
       })),
     });
   } catch (e) {

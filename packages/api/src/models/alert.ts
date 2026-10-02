@@ -8,7 +8,6 @@ export { AlertThresholdType } from '@hyperdx/common-utils/dist/types';
 import mongoose, { Schema } from 'mongoose';
 
 import type { ObjectId } from '.';
-import Team from './team';
 
 export enum AlertState {
   ALERT = 'ALERT',
@@ -194,7 +193,7 @@ const AlertSchema = new Schema<IAlert>(
     },
     team: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: Team.modelName,
+      ref: 'Team',
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,

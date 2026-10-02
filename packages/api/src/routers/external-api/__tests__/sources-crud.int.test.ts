@@ -4,6 +4,8 @@ import request, { SuperAgentTest } from 'supertest';
 
 import * as config from '@/config';
 import { validateConnectionId } from '@/controllers/connection';
+import type { TeamDoc as ITeam } from '@/db/repos/teams';
+import type { UserDoc as IUser } from '@/db/repos/users';
 import {
   DEFAULT_DATABASE,
   DEFAULT_LOGS_TABLE,
@@ -12,8 +14,6 @@ import {
 } from '@/fixtures';
 import Connection, { IConnection } from '@/models/connection';
 import { LogSource, Source, TraceSource } from '@/models/source';
-import { ITeam } from '@/models/team';
-import { IUser } from '@/models/user';
 
 describe('External API v2 Sources CRUD', () => {
   const server = getServer();

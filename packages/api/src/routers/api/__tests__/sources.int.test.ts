@@ -89,7 +89,7 @@ describe('sources router', () => {
     // Create test source
     await Source.create({
       ...MOCK_SOURCE,
-      team: team._id,
+      team: new Types.ObjectId(team._id),
     });
 
     const response = await agent.get('/sources').expect(200);
@@ -170,7 +170,7 @@ describe('sources router', () => {
       const { agent, team } = await getLoggedInAgent(server);
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
       const otherConnection = await createTestConnection(
         new Types.ObjectId(),
@@ -195,7 +195,7 @@ describe('sources router', () => {
       const { agent, team } = await getLoggedInAgent(server);
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       await agent
@@ -304,7 +304,7 @@ describe('sources router', () => {
 
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       const querySettings = [{ setting: 'max_execution_time', value: '120' }];
@@ -327,7 +327,7 @@ describe('sources router', () => {
 
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       const querySettings = Array.from({ length: 11 }, (_, i) => ({
@@ -353,7 +353,7 @@ describe('sources router', () => {
     // Create test source
     const source = await Source.create({
       ...MOCK_SOURCE,
-      team: team._id,
+      team: new Types.ObjectId(team._id),
     });
 
     const updatedSource = {
@@ -401,7 +401,7 @@ describe('sources router', () => {
         gauge: 'otel_metrics_gauge',
         sum: 'otel_metrics_sum',
       },
-      team: team._id,
+      team: new Types.ObjectId(team._id),
     });
 
     // Verify the metric source has metricTables
@@ -463,7 +463,7 @@ describe('sources router', () => {
         gauge: 'otel_metrics_gauge',
         sum: 'otel_metrics_sum',
       },
-      team: team._id,
+      team: new Types.ObjectId(team._id),
     });
 
     // Step 1: Update the metric source (but keep it as Metric)
@@ -661,7 +661,7 @@ describe('sources router', () => {
 
       const metricSource = await Source.create({
         ...MOCK_METRIC_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       await agent
@@ -687,7 +687,7 @@ describe('sources router', () => {
       const metricSource = await Source.create({
         ...MOCK_METRIC_SOURCE,
         seriesTable: 'otel_metrics_series',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       const createdSource = await Source.findById(metricSource._id).lean();
@@ -718,7 +718,7 @@ describe('sources router', () => {
 
       const metricSource = await Source.create({
         ...MOCK_METRIC_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       const createdSource = await Source.findById(metricSource._id).lean();
@@ -783,7 +783,7 @@ describe('sources router', () => {
       const metricSource = await Source.create({
         ...MOCK_METRIC_SOURCE,
         minAutoGranularity: '1 minute',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       await agent
@@ -809,7 +809,7 @@ describe('sources router', () => {
     // Create test source
     const source = await Source.create({
       ...MOCK_SOURCE,
-      team: team._id,
+      team: new Types.ObjectId(team._id),
     });
 
     await agent.delete(`/sources/${source._id}`).expect(200);
@@ -840,7 +840,7 @@ describe('sources router', () => {
       await Source.collection.insertOne({
         kind: SourceKind.Session,
         name: 'Legacy Session',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         connection: new Types.ObjectId(),
         from: { databaseName: 'default', tableName: 'otel_sessions' },
         traceSourceId: new Types.ObjectId().toString(),
@@ -862,7 +862,7 @@ describe('sources router', () => {
       await Source.collection.insertOne({
         kind: SourceKind.Trace,
         name: 'Legacy Trace',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         connection: new Types.ObjectId(),
         from: { databaseName: 'default', tableName: 'otel_traces' },
         timestampValueExpression: 'Timestamp',
@@ -889,7 +889,7 @@ describe('sources router', () => {
       await Source.collection.insertOne({
         kind: SourceKind.Trace,
         name: 'Trace with null logSourceId',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         connection: new Types.ObjectId(),
         from: { databaseName: 'default', tableName: 'otel_traces' },
         timestampValueExpression: 'Timestamp',
@@ -924,7 +924,7 @@ describe('sources router', () => {
       await Source.collection.insertOne({
         kind: SourceKind.Log,
         name: 'Flat Model Log',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         connection: new Types.ObjectId(),
         from: { databaseName: 'default', tableName: 'otel_logs' },
         timestampValueExpression: 'Timestamp',
@@ -954,7 +954,7 @@ describe('sources router', () => {
       const result = await Source.collection.insertOne({
         kind: SourceKind.Session,
         name: 'Legacy Session',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         connection: new Types.ObjectId(),
         from: { databaseName: 'default', tableName: 'otel_sessions' },
         traceSourceId: 'some-trace-source-id',
@@ -982,7 +982,7 @@ describe('sources router', () => {
       const result = await Source.collection.insertOne({
         kind: SourceKind.Session,
         name: 'Legacy Session',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         connection: connectionId,
         from: { databaseName: 'default', tableName: 'otel_sessions' },
         traceSourceId: 'some-trace-source-id',
@@ -1013,7 +1013,7 @@ describe('sources router', () => {
       const result = await Source.collection.insertOne({
         kind: SourceKind.Log,
         name: 'Flat Log',
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         connection: new Types.ObjectId(),
         from: { databaseName: 'default', tableName: 'otel_logs' },
         timestampValueExpression: 'Timestamp',
@@ -1043,7 +1043,7 @@ describe('sources router', () => {
         {
           kind: SourceKind.Log,
           name: 'Log',
-          team: team._id,
+          team: new Types.ObjectId(team._id),
           connection: connectionId,
           from: { databaseName: 'default', tableName: 'otel_logs' },
           timestampValueExpression: 'Timestamp',
@@ -1052,7 +1052,7 @@ describe('sources router', () => {
         {
           kind: SourceKind.Trace,
           name: 'Trace',
-          team: team._id,
+          team: new Types.ObjectId(team._id),
           connection: connectionId,
           from: { databaseName: 'default', tableName: 'otel_traces' },
           timestampValueExpression: 'Timestamp',
@@ -1068,7 +1068,7 @@ describe('sources router', () => {
         {
           kind: SourceKind.Session,
           name: 'Session',
-          team: team._id,
+          team: new Types.ObjectId(team._id),
           connection: connectionId,
           from: { databaseName: 'default', tableName: 'otel_sessions' },
           timestampValueExpression: 'TimestampTime',
@@ -1077,7 +1077,7 @@ describe('sources router', () => {
         {
           kind: SourceKind.Metric,
           name: 'Metric',
-          team: team._id,
+          team: new Types.ObjectId(team._id),
           connection: connectionId,
           from: { databaseName: 'default', tableName: '' },
           timestampValueExpression: 'TimeUnix',
@@ -1182,7 +1182,7 @@ describe('sources router', () => {
 
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'test_table_key_rollup_15m',
           kvRollupTable: 'test_table_kv_rollup_15m',
@@ -1220,7 +1220,7 @@ describe('sources router', () => {
 
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'old_key_rollup',
           kvRollupTable: 'old_kv_rollup',
@@ -1258,7 +1258,7 @@ describe('sources router', () => {
       await mongoose.connection.collection('sources').insertOne({
         ...MOCK_SOURCE,
         connection: new Types.ObjectId(MOCK_SOURCE.connection),
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'test_table_key_rollup_15m',
           kvRollupTable: 'test_table_kv_rollup_15m',
@@ -1283,7 +1283,7 @@ describe('sources router', () => {
 
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'test_table_key_rollup_15m',
           kvRollupTable: 'test_table_kv_rollup_15m',
@@ -1303,7 +1303,7 @@ describe('sources router', () => {
 
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
       });
 
       await agent
@@ -1405,7 +1405,7 @@ describe('sources router', () => {
 
       const source = await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         useTextIndexForImplicitColumn: UseTextIndex.Auto,
       });
 
@@ -1430,7 +1430,7 @@ describe('sources router', () => {
 
       await Source.create({
         ...MOCK_SOURCE,
-        team: team._id,
+        team: new Types.ObjectId(team._id),
         useTextIndexForImplicitColumn: UseTextIndex.Disabled,
       });
 

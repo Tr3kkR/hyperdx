@@ -1,4 +1,5 @@
 import { SourceKind } from '@hyperdx/common-utils/dist/types';
+import { ObjectId } from 'mongodb';
 
 import {
   getAgent,
@@ -157,7 +158,7 @@ describe('iac router', () => {
     });
     await Dashboard.collection.insertOne({
       name: 'Corrupt',
-      team: team._id,
+      team: new ObjectId(team._id),
       tiles: [{ id: 'bad', x: 0, y: 0, w: 4, h: 2 }],
     });
 

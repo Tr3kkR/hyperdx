@@ -19,10 +19,12 @@ import { formatTileAlertDisplayName } from '@hyperdx/common-utils/dist/alerts';
 import { DisplayType } from '@hyperdx/common-utils/dist/types';
 import mongoose from 'mongoose';
 
+import { closeDb, openDb } from '@/db';
+import { migrate } from '@/db/migrate';
+import * as teams from '@/db/repos/teams';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import Team from '@/models/team';
 import Webhook, { WebhookService } from '@/models/webhook';
 
 // Several schemas rely on empty strings satisfying `required` (an empty
@@ -276,13 +278,13 @@ async function purge(tag: string) {
 }
 
 async function seed(count: number, tag: string) {
-  const team = await Team.findOne({}).lean();
+  const team = teams.findTheTeam();
   if (team == null) {
     throw new Error(
       'No team found — register an account in the dev app first, then re-run.',
     );
   }
-  const teamId = team._id;
+  const teamId = new mongoose.Types.ObjectId(team._id);
 
   const source = await mongoose.connection
     .collection('sources')
@@ -456,6 +458,8 @@ async function main() {
 
   console.log(`Connecting to ${mongoUri}`);
   await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
+  openDb();
+  migrate();
   try {
     if (args.purge) {
       await purge(args.tag);
@@ -464,6 +468,7 @@ async function main() {
     }
   } finally {
     await mongoose.disconnect();
+    closeDb();
   }
 }
 

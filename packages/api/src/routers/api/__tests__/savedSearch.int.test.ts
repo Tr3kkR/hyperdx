@@ -1,3 +1,4 @@
+import * as users from '@/db/repos/users';
 import {
   getLoggedInAgent,
   getServer,
@@ -5,7 +6,6 @@ import {
 } from '@/fixtures';
 import Alert from '@/models/alert';
 import { SavedSearch } from '@/models/savedSearch';
-import User from '@/models/user';
 import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
 
 const MOCK_SAVED_SEARCH = {
@@ -151,7 +151,7 @@ describe('savedSearch router', () => {
       .expect(200);
 
     // Create a second user on the same team
-    const secondUser = await User.create({
+    const secondUser = users.create({
       email: 'second@test.com',
       name: 'Second User',
       team: team._id,
@@ -210,7 +210,7 @@ describe('savedSearch router', () => {
     // Verify createdBy was set on the alert document
     const alertFromDb = await Alert.findById(alert.body.data._id);
     expect(alertFromDb).toBeDefined();
-    expect(alertFromDb!.createdBy).toEqual(user._id);
+    expect(String(alertFromDb!.createdBy)).toEqual(user._id);
 
     // Verify GET /saved-search returns alerts with createdBy populated
     const savedSearches = await agent.get('/saved-search').expect(200);

@@ -4,6 +4,7 @@ import type { FilterQuery } from 'mongoose';
 import { z } from 'zod';
 
 import { ALERT_PAGE_POPULATE, type AlertPageRefs } from '@/controllers/alerts';
+import { hydrateUsers } from '@/db/repos/users';
 import type { ObjectId } from '@/models';
 import Alert, { AlertSource, AlertState, IAlert } from '@/models/alert';
 import { decodeCursor, encodeCursor } from '@/utils/pagination';
@@ -159,7 +160,13 @@ export async function getAlertsPage(
   // query. Omitting limit keeps the legacy unpaginated response.
   const docs = limit == null ? await query : await query.limit(limit + 1);
   const hasMore = limit != null && docs.length > limit;
-  const data = hasMore ? docs.slice(0, limit) : docs;
+  const data = (hasMore ? docs.slice(0, limit) : docs).map(
+    doc =>
+      hydrateUsers(
+        [doc.toObject({ virtuals: true })],
+        ['createdBy', 'silenced.by'],
+      )[0] as typeof doc,
+  );
   const last = data.at(-1);
   const nextCursor =
     hasMore && last != null

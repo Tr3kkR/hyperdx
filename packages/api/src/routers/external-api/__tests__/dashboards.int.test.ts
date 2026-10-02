@@ -9,6 +9,7 @@ import { ObjectId } from 'mongodb';
 import request from 'supertest';
 
 import * as config from '@/config';
+import * as users from '@/db/repos/users';
 import {
   DEFAULT_DATABASE,
   DEFAULT_TRACES_TABLE,
@@ -21,7 +22,6 @@ import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
 import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { Source } from '@/models/source';
-import User from '@/models/user';
 import Webhook, { WebhookService } from '@/models/webhook';
 import {
   ExternalDashboardTile,
@@ -224,7 +224,7 @@ describe('External API v2 Dashboards - old format', () => {
 
   describe('onboarding task recording', () => {
     const completedTasks = async () =>
-      (await User.findById(user._id))?.onboardingData?.completedTasks ?? [];
+      users.findById(String(user._id))?.onboardingData?.completedTasks ?? [];
 
     // Recording is fire-and-forget (not awaited by the handler), so poll
     // briefly rather than reading once immediately after the response.

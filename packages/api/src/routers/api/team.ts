@@ -266,13 +266,11 @@ router.get('/members', async (req, res: TeamMembersExpRes, next) => {
     const teamUsers = await findUsersByTeam(teamId);
     res.json({
       data: teamUsers.map(user => ({
-        ...pick(user.toJSON({ virtuals: true }), [
-          '_id',
-          'email',
-          'name',
-          'hasPasswordAuth',
-        ]),
-        isCurrentUser: user._id.equals(userId),
+        _id: user._id,
+        email: user.email,
+        name: user.name,
+        hasPasswordAuth: true,
+        isCurrentUser: user._id === String(userId),
       })),
     });
   } catch (e) {

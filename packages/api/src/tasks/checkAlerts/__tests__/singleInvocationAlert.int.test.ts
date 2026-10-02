@@ -179,10 +179,9 @@ describe('Single Invocation Alert Test', () => {
     ]);
 
     // Get the alert with populated references
-    const enhancedAlert: any = await Alert.findById(alert.id).populate([
-      'team',
+    const enhancedAlert: any = await Alert.findById(alert.id).populate(
       'savedSearch',
-    ]);
+    );
 
     // Process the alert - this should trigger the webhook
     const details: any = {
@@ -355,10 +354,9 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate([
-      'team',
+    const enhancedAlert: any = await Alert.findById(alert.id).populate(
       'savedSearch',
-    ]);
+    );
 
     const details: any = {
       alert: enhancedAlert,
@@ -483,10 +481,9 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate([
-      'team',
+    const enhancedAlert: any = await Alert.findById(alert.id).populate(
       'savedSearch',
-    ]);
+    );
 
     const details: any = {
       alert: enhancedAlert,
@@ -622,10 +619,9 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate([
-      'team',
+    const enhancedAlert: any = await Alert.findById(alert.id).populate(
       'savedSearch',
-    ]);
+    );
 
     const details: any = {
       alert: enhancedAlert,
@@ -792,10 +788,9 @@ describe('Single Invocation Alert Test', () => {
     );
 
     // Get enhanced alert with populated relations
-    const enhancedAlert: any = await Alert.findById(alert.id).populate([
-      'team',
+    const enhancedAlert: any = await Alert.findById(alert.id).populate(
       'dashboard',
-    ]);
+    );
 
     // Find the tile we're alerting on (should be the second tile)
     const tile = dashboard.tiles?.find((t: any) => t.id === 'second-tile-id');
@@ -947,10 +942,9 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate([
-      'team',
+    const enhancedAlert: any = await Alert.findById(alert.id).populate(
       'savedSearch',
-    ]);
+    );
 
     const tile = dashboard.tiles?.find((t: any) => t.id === 'number-tile-1');
 

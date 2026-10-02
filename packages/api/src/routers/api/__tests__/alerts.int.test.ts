@@ -816,7 +816,7 @@ describe('alerts router', () => {
     // Get the alert directly from database to verify createdBy was set
     const alertFromDb = await Alert.findById(alert.body.data._id);
     expect(alertFromDb).toBeDefined();
-    expect(alertFromDb!.createdBy).toEqual(user._id);
+    expect(String(alertFromDb!.createdBy)).toEqual(user._id);
     expect(alertFromDb!.threshold).toBe(5);
 
     // Update the alert with a different threshold
@@ -834,7 +834,7 @@ describe('alerts router', () => {
     // Get the alert from database again to verify createdBy is preserved
     const alertFromDbAfterUpdate = await Alert.findById(alert.body.data._id);
     expect(alertFromDbAfterUpdate).toBeDefined();
-    expect(alertFromDbAfterUpdate!.createdBy).toEqual(user._id); // ✅ createdBy should still be the original user
+    expect(String(alertFromDbAfterUpdate!.createdBy)).toEqual(user._id); // ✅ createdBy should still be the original user
     expect(alertFromDbAfterUpdate!.threshold).toBe(15); // ✅ threshold should be updated
   });
 
@@ -974,7 +974,7 @@ describe('alerts router', () => {
     const alertFromDb = await Alert.findById(alert.body.data._id);
     expect(alertFromDb).toBeDefined();
     expect(alertFromDb!.silenced).toBeDefined();
-    expect(alertFromDb!.silenced!.by).toEqual(user._id);
+    expect(String(alertFromDb!.silenced!.by)).toEqual(user._id);
     expect(alertFromDb!.silenced!.at).toBeDefined();
     expect(new Date(alertFromDb!.silenced!.until).toISOString()).toBe(
       mutedUntil,

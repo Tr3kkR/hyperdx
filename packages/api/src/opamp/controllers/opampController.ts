@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 
 import * as config from '@/config';
 import { getAllTeams } from '@/controllers/team';
-import type { ITeam } from '@/models/team';
+import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import { agentService } from '@/opamp/services/agentService';
 import {
   decodeAgentCapabilities,

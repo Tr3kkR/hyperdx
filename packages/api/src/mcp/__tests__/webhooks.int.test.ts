@@ -1,9 +1,9 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
+import * as Team from '@/db/repos/teams';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
 import Alert from '@/models/alert';
-import Team from '@/models/team';
 import Webhook, { WebhookService } from '@/models/webhook';
 
 import { callTool, createTestClient, getFirstText } from './mcpTestUtils';

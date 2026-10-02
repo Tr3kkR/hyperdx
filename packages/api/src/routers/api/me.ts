@@ -39,6 +39,8 @@ router.get('/', async (req, res: express.Response<MeApiResponse>, next) => {
       team: teamId,
     } = req.user;
 
+    if (teamId == null) throw new Api404Error(`Team not found for user ${id}`);
+
     const team = await getTeam(teamId);
     if (team == null) {
       throw new Api404Error(`Team not found for user ${id}`);
@@ -49,7 +51,7 @@ router.get('/', async (req, res: express.Response<MeApiResponse>, next) => {
       createdAt,
       email,
       id,
-      name,
+      name: name ?? email,
       // Defaults for users predating the field.
       onboardingData: OnboardingDataSchema.parse(onboardingData ?? {}),
       team,

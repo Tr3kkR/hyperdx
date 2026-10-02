@@ -1,10 +1,10 @@
 import { ObjectId } from 'mongodb';
 import request, { SuperAgentTest } from 'supertest';
 
+import type { TeamDoc as ITeam } from '@/db/repos/teams';
+import type { UserDoc as IUser } from '@/db/repos/users';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import Connection from '@/models/connection';
-import { ITeam } from '@/models/team';
-import { IUser } from '@/models/user';
 
 const CONNECTIONS_BASE_URL = '/api/v2/connections';
 

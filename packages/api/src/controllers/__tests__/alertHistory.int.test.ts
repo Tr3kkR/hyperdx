@@ -8,10 +8,10 @@ import {
   getRecentAlertHistories,
   getRecentAlertHistoriesBatch,
 } from '@/controllers/alertHistory';
+import * as Team from '@/db/repos/teams';
 import { clearDBCollections, closeDB, connectDB } from '@/fixtures';
 import Alert, { AlertState } from '@/models/alert';
 import AlertHistory from '@/models/alertHistory';
-import Team from '@/models/team';
 
 describe('alertHistory controller', () => {
   beforeAll(async () => {

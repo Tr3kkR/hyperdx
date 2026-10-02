@@ -5,9 +5,9 @@ import os from 'os';
 import path from 'path';
 
 import { createTeam } from '@/controllers/team';
+import * as Team from '@/db/repos/teams';
 import { clearDBCollections, closeDB, connectDB, makeTile } from '@/fixtures';
 import Dashboard from '@/models/dashboard';
-import Team from '@/models/team';
 import {
   readDashboardFiles,
   syncDashboards,
@@ -235,7 +235,7 @@ describe('provisionDashboards', () => {
 
     it('provisions to multiple teams', async () => {
       const teamA = await createTeam({ name: 'Team A' });
-      const teamB = await new Team({ name: 'Team B' }).save();
+      const teamB = Team.create({ name: 'Team B' });
       fs.writeFileSync(
         path.join(tmpDir, 'shared.json'),
         JSON.stringify({

@@ -15,6 +15,7 @@ import {
   getTeamDashboardAlertsByDashboardAndTile,
 } from '@/controllers/alerts';
 import { recordOnboardingTaskCompletion } from '@/controllers/user';
+import { hydrateUsers } from '@/db/repos/users';
 import type { ObjectId } from '@/models';
 import type { AlertDocument, IAlert } from '@/models/alert';
 import Dashboard, { IDashboard } from '@/models/dashboard';
@@ -142,21 +143,21 @@ function withResolvedDisplayFields(
     return undefined;
   }
   return {
-    ...alert.toJSON(),
+    ...hydrateUsers([alert.toJSON()], ['createdBy'])[0],
     ...resolveAlertDisplayFields(alert, { dashboard }),
   };
 }
 
 export async function getDashboards(teamId: ObjectId) {
   const [_dashboards, alerts] = await Promise.all([
-    Dashboard.find({ team: teamId })
-      .populate('createdBy', 'email name')
-      .populate('updatedBy', 'email name'),
+    Dashboard.find({ team: teamId }),
     getTeamDashboardAlertsByDashboardAndTile(teamId),
   ]);
 
-  const dashboards = _dashboards
-    .map(d => d.toJSON())
+  const dashboards = hydrateUsers(
+    _dashboards.map(d => d.toJSON()),
+    ['createdBy', 'updatedBy'],
+  )
     .map(d => ({
       ...d,
       tiles: d.tiles.map(t => ({
@@ -177,9 +178,7 @@ export async function getDashboards(teamId: ObjectId) {
 
 export async function getDashboard(dashboardId: string, teamId: ObjectId) {
   const [_dashboard, alerts] = await Promise.all([
-    Dashboard.findOne({ _id: dashboardId, team: teamId })
-      .populate('createdBy', 'email name')
-      .populate('updatedBy', 'email name'),
+    Dashboard.findOne({ _id: dashboardId, team: teamId }),
     getDashboardAlertsByTile(teamId, dashboardId),
   ]);
 
@@ -188,7 +187,7 @@ export async function getDashboard(dashboardId: string, teamId: ObjectId) {
   }
 
   return healLegacyDashboardTileColors({
-    ..._dashboard.toJSON(),
+    ...hydrateUsers([_dashboard.toJSON()], ['createdBy', 'updatedBy'])[0],
     tiles: _dashboard.tiles.map(t => ({
       ...t,
       config: {
