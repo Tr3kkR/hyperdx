@@ -2,6 +2,7 @@ import { SourceKind } from '@hyperdx/common-utils/dist/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import * as config from '@/config';
+import type { SourceDoc } from '@/db/repos/sources';
 import {
   bulkInsertData,
   DEFAULT_DATABASE,
@@ -11,8 +12,10 @@ import {
   getServer,
 } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
-import Connection from '@/models/connection';
-import { Source, type SourceDocument } from '@/models/source';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 import { callTool, createTestClient, getFirstText } from './mcpTestUtils';
 
@@ -66,8 +69,8 @@ describe('MCP Trace Tools', () => {
   let team: any;
   let user: any;
   let connection: any;
-  let traceSource: SourceDocument;
-  let logSource: SourceDocument;
+  let traceSource: SourceDoc;
+  let logSource: SourceDoc;
   let client: Client;
 
   beforeAll(async () => {
@@ -79,7 +82,7 @@ describe('MCP Trace Tools', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -87,7 +90,7 @@ describe('MCP Trace Tools', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    logSource = await Source.create({
+    logSource = await createSourceFixture({
       kind: SourceKind.Log,
       team: team._id,
       from: {
@@ -104,7 +107,7 @@ describe('MCP Trace Tools', () => {
       spanIdExpression: 'SpanId',
     });
 
-    traceSource = await Source.create({
+    traceSource = await createSourceFixture({
       kind: SourceKind.Trace,
       team: team._id,
       from: {
@@ -473,7 +476,7 @@ describe('MCP Trace Tools', () => {
     describe('logSource edge cases', () => {
       it('should handle missing logSourceId gracefully (no logs section)', async () => {
         // Create a trace source WITHOUT logSourceId
-        const noLogTraceSource = await Source.create({
+        const noLogTraceSource = await createSourceFixture({
           kind: SourceKind.Trace,
           team: team._id,
           from: {
@@ -513,7 +516,7 @@ describe('MCP Trace Tools', () => {
       });
 
       it('should note when logSourceId points to a non-existent source', async () => {
-        const badLogTraceSource = await Source.create({
+        const badLogTraceSource = await createSourceFixture({
           kind: SourceKind.Trace,
           team: team._id,
           from: {
@@ -554,7 +557,7 @@ describe('MCP Trace Tools', () => {
 
       it('should note when logSourceId points to a non-log source', async () => {
         // Point logSourceId at the trace source itself (wrong kind)
-        const wrongKindTraceSource = await Source.create({
+        const wrongKindTraceSource = await createSourceFixture({
           kind: SourceKind.Trace,
           team: team._id,
           from: {

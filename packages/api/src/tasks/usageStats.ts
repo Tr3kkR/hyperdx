@@ -7,10 +7,10 @@ import pino from 'pino';
 
 import { ClickhouseClient } from '@/clickhouse';
 import * as config from '@/config';
+import * as connectionsRepo from '@/db/repos/connections';
+import * as sourcesRepo from '@/db/repos/sources';
 import * as teams from '@/db/repos/teams';
 import * as users from '@/db/repos/users';
-import Connection from '@/models/connection';
-import { Source, SourceDocument } from '@/models/source';
 
 // Lazily construct the pino logger so the thread-stream worker isn't spawned
 // at module-load time. Importing this file (e.g. via api-app.ts during tests)
@@ -38,7 +38,7 @@ function getUsageStatsLogger(): pino.Logger {
   return usageStatsLogger;
 }
 
-function extractTableNames(source: SourceDocument): string[] {
+function extractTableNames(source: sourcesRepo.SourceDoc): string[] {
   const tables: string[] = [];
   if (source.kind === SourceKind.Metric) {
     // Cast to TMetricSource to access metricTables after kind narrowing
@@ -55,9 +55,8 @@ function extractTableNames(source: SourceDocument): string[] {
 }
 
 const getClickhouseTableSize = async () => {
-  // fetch mongo data
-  const connections = await Connection.find();
-  const sources = await Source.find();
+  const connections = connectionsRepo.list();
+  const sources = sourcesRepo.list();
 
   // build map for each db instance
   const distributedTableMap = new Map<string, string[]>();
@@ -87,7 +86,10 @@ const getClickhouseTableSize = async () => {
     query_params.dbName = dbName;
 
     // find connection
-    const connection = connections.find(c => c.id === connectionId);
+    const publicConnection = connections.find(c => c.id === connectionId);
+    const connection =
+      publicConnection &&
+      connectionsRepo.findByIdWithPassword(connectionId, publicConnection.team);
     if (!connection) continue;
 
     // query clickhouse

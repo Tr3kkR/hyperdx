@@ -4,6 +4,7 @@ import { ObjectId } from 'mongodb';
 import request from 'supertest';
 
 import * as config from '@/config';
+import type { SourceDoc } from '@/db/repos/sources';
 import {
   bulkInsertLogs,
   bulkInsertMetricsGauge,
@@ -14,8 +15,10 @@ import {
   getLoggedInAgent,
   getServer,
 } from '@/fixtures';
-import Connection from '@/models/connection';
-import { ISource, Source } from '@/models/source';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 // Default time range for tests (1 hour)
 // Floor to minute so all derived timestamps (including test data inserted at
@@ -79,8 +82,8 @@ describe('External API v2 Charts', () => {
   let team: any;
   let user: any;
   let connection: any;
-  let logSource: ISource;
-  let metricSource: ISource;
+  let logSource: SourceDoc;
+  let metricSource: SourceDoc;
 
   beforeAll(async () => {
     await server.start();
@@ -92,7 +95,7 @@ describe('External API v2 Charts', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -100,7 +103,7 @@ describe('External API v2 Charts', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    logSource = await Source.create({
+    logSource = await createSourceFixture({
       kind: SourceKind.Log,
       team: team._id,
       from: {
@@ -112,7 +115,7 @@ describe('External API v2 Charts', () => {
       name: 'Logs',
     });
 
-    metricSource = await Source.create({
+    metricSource = await createSourceFixture({
       kind: SourceKind.Metric,
       team: team._id,
       from: {

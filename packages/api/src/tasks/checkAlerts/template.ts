@@ -17,6 +17,7 @@ import {
   isRangeThresholdType,
   SavedChartConfig,
   SourceKind,
+  type TSource,
   zAlertChannelType,
 } from '@hyperdx/common-utils/dist/types';
 import Handlebars, { HelperOptions } from 'handlebars';
@@ -34,7 +35,7 @@ import {
 } from '@/models/alert';
 import { IDashboard } from '@/models/dashboard';
 import { ISavedSearch } from '@/models/savedSearch';
-import { ISource } from '@/models/source';
+type ISource = TSource & { team: string };
 import { IWebhook } from '@/models/webhook';
 import {
   computeAliasWithClauses,

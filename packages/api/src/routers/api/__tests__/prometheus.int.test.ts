@@ -10,13 +10,13 @@ import {
   getServer,
   seedTimeSeriesTagsTable,
 } from '@/fixtures';
-import Connection from '@/models/connection';
 import {
   CLICKHOUSE_PROMETHEUS_API_PREFIX,
   clickhousePrometheusUpstream,
   joinPrometheusUpstreamUrl,
   PROMETHEUS_MAX_EXEMPLAR_WINDOW_SEC,
 } from '@/routers/api/prometheus';
+import { createConnectionFixture } from '@/test/sqliteMetadata';
 
 const mockFetch = jest.mocked(global.fetch);
 
@@ -80,7 +80,7 @@ describe('prometheus router', () => {
     teamId: Types.ObjectId,
     host = 'http://prom.example.com',
   ) => {
-    return Connection.create({
+    return createConnectionFixture({
       team: teamId,
       name: 'Prom',
       host,
@@ -91,7 +91,7 @@ describe('prometheus router', () => {
   };
 
   const seedClickHouseConnection = async (teamId: Types.ObjectId) => {
-    return Connection.create({
+    return createConnectionFixture({
       team: teamId,
       name: 'CH',
       host: config.CLICKHOUSE_HOST,

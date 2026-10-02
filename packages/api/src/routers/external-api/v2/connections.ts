@@ -9,7 +9,7 @@ import {
   getConnectionsByTeam,
   updateConnection,
 } from '@/controllers/connection';
-import { ConnectionDocument } from '@/models/connection';
+import type { ConnectionDoc } from '@/db/repos/connections';
 import { processRequestWithEnhancedErrors as validateRequest } from '@/utils/enhancedErrors';
 import logger from '@/utils/logger';
 import { objectIdSchema } from '@/utils/zod';
@@ -37,9 +37,9 @@ const updateConnectionBodySchema = ConnectionSchema.omit({ id: true }).extend({
     .nullable(),
 });
 
-function formatExternalConnection(connection: ConnectionDocument) {
+function formatExternalConnection(connection: ConnectionDoc) {
   // Convert to JSON so that any ObjectIds and Dates are converted to strings
-  const json = JSON.stringify(connection.toJSON({ virtuals: true }));
+  const json = JSON.stringify(connection);
 
   // Parse using the externalConnectionSchema to strip out any fields not
   // defined in the schema (e.g. password, team, _id, __v)

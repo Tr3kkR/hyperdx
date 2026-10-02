@@ -13,7 +13,6 @@ jest.mock('@/mcp/tools/query/helpers', () => {
   };
 });
 
-jest.mock('@/models/source', () => ({}));
 jest.mock('@/controllers/sources', () => ({}));
 jest.mock('@/controllers/connection', () => ({}));
 

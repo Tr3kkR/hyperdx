@@ -10,8 +10,10 @@ import {
 } from '@/fixtures';
 import { createTestClient } from '@/mcp/__tests__/mcpTestUtils';
 import { McpContext } from '@/mcp/tools/types';
-import Connection from '@/models/connection';
-import { Source } from '@/models/source';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 /**
  * Shared setup/teardown for all dashboard MCP tool tests.
@@ -40,7 +42,7 @@ export function setupDashboardTests() {
     ctx.team = result.team;
     ctx.user = result.user;
 
-    ctx.connection = await Connection.create({
+    ctx.connection = await createConnectionFixture({
       team: ctx.team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -48,7 +50,7 @@ export function setupDashboardTests() {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    ctx.traceSource = await Source.create({
+    ctx.traceSource = await createSourceFixture({
       kind: SourceKind.Trace,
       team: ctx.team._id,
       from: {

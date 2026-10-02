@@ -1,5 +1,4 @@
 // TODO: we might want to move this test file to common-utils package
-
 import { ChSql, chSql } from '@hyperdx/common-utils/dist/clickhouse';
 import { ClickhouseClient } from '@hyperdx/common-utils/dist/clickhouse/node';
 import { getMetadata } from '@hyperdx/common-utils/dist/core/metadata';
@@ -27,8 +26,10 @@ import {
   getServer,
   seedExponentialHistogramMetric,
 } from '@/fixtures';
-import Connection from '@/models/connection';
-import { Source } from '@/models/source';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 const TEST_METRIC_TABLES = {
   sum: DEFAULT_METRICS_TABLE.SUM,
@@ -97,14 +98,14 @@ describe('renderChartConfig', () => {
 
   beforeEach(async () => {
     team = await createTeam({ name: 'My Team' });
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
       username: config.CLICKHOUSE_USER,
       password: config.CLICKHOUSE_PASSWORD,
     });
-    logSource = await Source.create({
+    logSource = await createSourceFixture({
       kind: 'log',
       team: team._id,
       from: {
@@ -115,7 +116,7 @@ describe('renderChartConfig', () => {
       connection: connection.id,
       name: 'Logs',
     });
-    metricSource = await Source.create({
+    metricSource = await createSourceFixture({
       kind: 'metric',
       team: team._id,
       from: {

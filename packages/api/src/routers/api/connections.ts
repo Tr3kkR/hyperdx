@@ -19,7 +19,7 @@ router.get('/', async (req, res, next) => {
 
     const connections = await getConnectionsByTeam(teamId.toString());
 
-    res.json(connections.map(c => c.toJSON({ virtuals: true })));
+    res.json(connections);
   } catch (e) {
     next(e);
   }

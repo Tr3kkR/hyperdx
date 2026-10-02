@@ -10,6 +10,7 @@ import {
   AssistantLineTableConfigSchema,
   ChartConfigWithDateRange,
   pickSampleWeightExpressionProps,
+  type TSource,
 } from '@hyperdx/common-utils/dist/types';
 import type { LanguageModel } from 'ai';
 import * as chrono from 'chrono-node';
@@ -18,7 +19,6 @@ import z from 'zod';
 
 import { ClickhouseClient } from '@/clickhouse';
 import * as config from '@/config';
-import { ISource } from '@/models/source';
 import { parseJSON } from '@/utils/common';
 import { Api500Error } from '@/utils/errors';
 import logger from '@/utils/logger';
@@ -95,7 +95,7 @@ export function llmTelemetry(metadata: Record<string, string | undefined>): {
   };
 }
 
-export async function getAIMetadata(source: ISource) {
+export async function getAIMetadata(source: TSource & { team: string }) {
   const connectionId = source.connection.toString();
 
   const connection = await getConnectionById(
@@ -268,7 +268,7 @@ const mergePath = (path: string[], jsonColumns: string[] = []) => {
 
 export function getChartConfigFromResolvedConfig(
   resObject: z.infer<typeof AssistantLineTableConfigSchema>,
-  source: ISource,
+  source: TSource & { team: string },
 ): AILineTableResponse {
   const parsedTimeRange = parseTimeRangeInput(resObject.timeRange);
   // TODO: More robust recovery logic

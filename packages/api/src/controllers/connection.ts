@@ -1,5 +1,6 @@
+import { isId } from '@/db/ids';
+import * as connections from '@/db/repos/connections';
 import type { ObjectId } from '@/models';
-import Connection, { IConnection } from '@/models/connection';
 import { objectIdSchema } from '@/utils/zod';
 
 export type ConnectionValidation =
@@ -21,10 +22,9 @@ export async function validateConnectionId(
   if (teamId == null) {
     return { ok: false, status: 403, message: 'Forbidden' };
   }
-  const connectionExists = await Connection.exists({
-    _id: parsed.data,
-    team: teamId,
-  });
+  const connectionExists = isId(String(parsed.data))
+    ? connections.findById(String(parsed.data), String(teamId))
+    : null;
   if (connectionExists == null) {
     return {
       ok: false,
@@ -40,11 +40,11 @@ export async function validateConnectionId(
 // the team-scoped variants below.
 export function getConnections() {
   // Never return password back to the user
-  return Connection.find({});
+  return connections.list();
 }
 
 export function getConnectionsByTeam(team: string) {
-  return Connection.find({ team });
+  return connections.list(team);
 }
 
 export function getConnectionById(
@@ -52,45 +52,27 @@ export function getConnectionById(
   connectionId: string,
   selectPassword = false,
 ) {
-  return Connection.findOne({ _id: connectionId, team }).select(
-    selectPassword ? '+password' : '',
-  );
+  return selectPassword
+    ? connections.findByIdWithPassword(connectionId, team)
+    : connections.findById(connectionId, team);
 }
 
 export function createConnection(
   team: string,
-  connection: Omit<IConnection, 'id' | '_id'>,
+  connection: Partial<connections.ConnectionDoc>,
 ) {
-  return Connection.create({ ...connection, team });
+  return connections.create(team, connection);
 }
 
 export function updateConnection(
   team: string,
   connectionId: string,
-  connection: Omit<IConnection, 'id' | '_id'>,
+  connection: Partial<connections.ConnectionDoc>,
   unsetFields: string[] = [],
 ) {
-  const updateOperation: Record<string, unknown> = { $set: connection };
-
-  if (unsetFields.length > 0) {
-    updateOperation.$unset = unsetFields.reduce(
-      (acc, field) => {
-        acc[field] = '';
-        return acc;
-      },
-      {} as Record<string, string>,
-    );
-  }
-
-  return Connection.findOneAndUpdate(
-    { _id: connectionId, team },
-    updateOperation,
-    {
-      new: true,
-    },
-  );
+  return connections.update(connectionId, team, connection, unsetFields);
 }
 
 export function deleteConnection(team: string, connectionId: string) {
-  return Connection.findOneAndDelete({ _id: connectionId, team });
+  return connections.remove(connectionId, team);
 }

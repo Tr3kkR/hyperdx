@@ -15,7 +15,7 @@ import {
   getSources,
   updateSource,
 } from '@/controllers/sources';
-import { SourceDocument } from '@/models/source';
+import type { SourceDoc } from '@/db/repos/sources';
 import { processRequestWithEnhancedErrors as validateRequest } from '@/utils/enhancedErrors';
 import logger from '@/utils/logger';
 import { objectIdSchema } from '@/utils/zod';
@@ -149,27 +149,8 @@ function applyLegacyDefaults(
   return parsed;
 }
 
-function formatExternalSource(source: SourceDocument) {
-  // Convert to JSON so that any ObjectIds are converted to strings
-  const json = JSON.stringify(
-    (() => {
-      switch (source.kind) {
-        case SourceKind.Log:
-          return source.toJSON({ getters: true });
-        case SourceKind.Trace:
-          return source.toJSON({ getters: true });
-        case SourceKind.Metric:
-          return source.toJSON({ getters: true });
-        case SourceKind.Session:
-          return source.toJSON({ getters: true });
-        case SourceKind.Promql:
-          return source.toJSON({ getters: true });
-        default:
-          source satisfies never;
-          return {};
-      }
-    })(),
-  );
+function formatExternalSource(source: SourceDoc) {
+  const json = JSON.stringify(source);
 
   // Parse using the SourceSchema to strip out any fields not defined in the schema
   const parseResult = SourceSchema.safeParse(
@@ -956,7 +937,7 @@ router.get('/', async (req, res, next) => {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
-    const sources: SourceDocument[] = await getSources(teamId.toString());
+    const sources: SourceDoc[] = await getSources(teamId.toString());
 
     return res.json({
       data: sources.map(formatExternalSource).filter(s => s !== undefined),

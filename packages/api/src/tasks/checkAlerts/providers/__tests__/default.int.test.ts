@@ -10,15 +10,18 @@ import {
   RAW_SQL_ALERT_TEMPLATE,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import Connection from '@/models/connection';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import {
   AlertProvider,
   AlertTaskType,
   loadProvider,
 } from '@/tasks/checkAlerts/providers';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+  setSourceConnectionFixture,
+} from '@/test/sqliteMetadata';
 
 const MOCK_SAVED_SEARCH: any = {
   id: 'fake-saved-search-id',
@@ -64,7 +67,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create connection
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Test Connection',
         host: 'http://localhost:8123',
@@ -73,7 +76,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create source
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -132,7 +135,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create connection
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Test Connection',
         host: 'http://localhost:8123',
@@ -141,7 +144,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create source
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -260,7 +263,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create single connection
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Shared Connection',
         host: 'http://localhost:8123',
@@ -269,7 +272,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create source
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -352,7 +355,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create two different connections
-      const connection1 = await Connection.create({
+      const connection1 = await createConnectionFixture({
         team: team._id,
         name: 'Connection 1',
         host: 'http://localhost:8123',
@@ -360,7 +363,7 @@ describe('DefaultAlertProvider', () => {
         password: 'test1',
       });
 
-      const connection2 = await Connection.create({
+      const connection2 = await createConnectionFixture({
         team: team._id,
         name: 'Connection 2',
         host: 'http://localhost:8124',
@@ -369,7 +372,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create sources for each connection
-      const source1 = await Source.create({
+      const source1 = await createSourceFixture({
         team: team._id,
         name: 'Source 1',
         kind: 'log',
@@ -381,7 +384,7 @@ describe('DefaultAlertProvider', () => {
         connection: connection1._id,
       });
 
-      const source2 = await Source.create({
+      const source2 = await createSourceFixture({
         team: team._id,
         name: 'Source 2',
         kind: 'log',
@@ -548,7 +551,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create source with non-existent connection
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -613,7 +616,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create connection with specific password
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Test Connection',
         host: 'http://localhost:8123',
@@ -622,7 +625,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create source
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -675,7 +678,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create connection with specific password
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Test Connection',
         host: 'http://localhost:8124',
@@ -684,7 +687,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create source
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -738,7 +741,7 @@ describe('DefaultAlertProvider', () => {
     it('should process a single inline alert', async () => {
       const team = await createTeam({ name: 'Test Team' });
 
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Test Connection',
         host: 'http://localhost:8123',
@@ -746,7 +749,7 @@ describe('DefaultAlertProvider', () => {
         password: 'test',
       });
 
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -802,21 +805,21 @@ describe('DefaultAlertProvider', () => {
     // through the pinned connection.
     const setupRawSqlSourceMove = async () => {
       const team = await createTeam({ name: 'Test Team' });
-      const connection = await Connection.create({
+      const connection = await createConnectionFixture({
         team: team._id,
         name: 'Original Connection',
         host: 'http://localhost:8123',
         username: 'test',
         password: 'test',
       });
-      const otherConnection = await Connection.create({
+      const otherConnection = await createConnectionFixture({
         team: team._id,
         name: 'Other Connection',
         host: 'http://localhost:8124',
         username: 'test',
         password: 'test',
       });
-      const source = await Source.create({
+      const source = await createSourceFixture({
         team: team._id,
         name: 'Test Source',
         kind: 'log',
@@ -863,10 +866,7 @@ describe('DefaultAlertProvider', () => {
         expect(result[0].alerts[0].source?.name).toBe('Test Source');
       }
 
-      await Source.updateOne(
-        { _id: source._id },
-        { $set: { connection: otherConnection._id } },
-      );
+      setSourceConnectionFixture(source._id, otherConnection._id);
 
       result = await provider.getAlertTasks();
       expect(result).toHaveLength(1);
@@ -926,10 +926,7 @@ describe('DefaultAlertProvider', () => {
         expect(result[0].alerts[0].source?.name).toBe('Test Source');
       }
 
-      await Source.updateOne(
-        { _id: source._id },
-        { $set: { connection: otherConnection._id } },
-      );
+      setSourceConnectionFixture(source._id, otherConnection._id);
 
       result = await provider.getAlertTasks();
       expect(result).toHaveLength(1);

@@ -4,6 +4,9 @@ import request, { SuperAgentTest } from 'supertest';
 
 import * as config from '@/config';
 import { validateConnectionId } from '@/controllers/connection';
+import { getDb } from '@/db';
+import type { ConnectionDoc } from '@/db/repos/connections';
+import * as sourcesRepo from '@/db/repos/sources';
 import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import type { UserDoc as IUser } from '@/db/repos/users';
 import {
@@ -12,15 +15,18 @@ import {
   getLoggedInAgent,
   getServer,
 } from '@/fixtures';
-import Connection, { IConnection } from '@/models/connection';
-import { LogSource, Source, TraceSource } from '@/models/source';
+import { findSourceFixture } from '@/test/sqliteMetadata';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 describe('External API v2 Sources CRUD', () => {
   const server = getServer();
   let agent: SuperAgentTest;
   let team: ITeam;
   let user: IUser;
-  let connection: IConnection;
+  let connection: ConnectionDoc;
 
   beforeAll(async () => {
     await server.start();
@@ -32,7 +38,7 @@ describe('External API v2 Sources CRUD', () => {
     team = result.team;
     user = result.user;
 
-    connection = await Connection.create({
+    connection = await createConnectionFixture({
       team: team._id,
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
@@ -91,7 +97,7 @@ describe('External API v2 Sources CRUD', () => {
   });
 
   const createOtherTeamConnection = (otherTeamId: mongoose.Types.ObjectId) =>
-    Connection.create({
+    createConnectionFixture({
       team: otherTeamId,
       name: 'Other Team Connection',
       host: config.CLICKHOUSE_HOST,
@@ -102,7 +108,7 @@ describe('External API v2 Sources CRUD', () => {
   const createOtherTeamSource = async () => {
     const otherTeamId = new mongoose.Types.ObjectId();
     const otherConnection = await createOtherTeamConnection(otherTeamId);
-    return LogSource.create({
+    return createSourceFixture({
       kind: SourceKind.Log,
       team: otherTeamId,
       name: 'Other Team Source',
@@ -124,7 +130,7 @@ describe('External API v2 Sources CRUD', () => {
     });
 
     it('should return a source by id', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
@@ -182,7 +188,7 @@ describe('External API v2 Sources CRUD', () => {
       });
       expect(typeof response.body.data.id).toBe('string');
 
-      const persisted = await Source.findById(response.body.data.id);
+      const persisted = await findSourceFixture(response.body.data.id);
       expect(persisted).not.toBeNull();
       expect(persisted!.team.toString()).toBe(team._id.toString());
     });
@@ -208,8 +214,12 @@ describe('External API v2 Sources CRUD', () => {
       expect(response.body.data.materializedViews[0].minGranularity).toBe('5m');
 
       // The database stores the internal SQL interval format
-      const persisted = await TraceSource.findById(response.body.data.id);
-      expect(persisted!.materializedViews![0].minGranularity).toBe('5 minute');
+      const persisted = await findSourceFixture(response.body.data.id);
+      expect(
+        persisted && 'materializedViews' in persisted
+          ? persisted.materializedViews![0].minGranularity
+          : undefined,
+      ).toBe('5 minute');
     });
 
     it('should map metadataMaterializedViews granularity to internal format', async () => {
@@ -230,10 +240,12 @@ describe('External API v2 Sources CRUD', () => {
       );
 
       // The database stores the internal SQL interval format
-      const persisted = await LogSource.findById(response.body.data.id);
-      expect(persisted!.metadataMaterializedViews!.granularity).toBe(
-        '15 minute',
-      );
+      const persisted = await findSourceFixture(response.body.data.id);
+      expect(
+        persisted && 'metadataMaterializedViews' in persisted
+          ? persisted.metadataMaterializedViews!.granularity
+          : undefined,
+      ).toBe('15 minute');
     });
 
     it('should create a promql source', async () => {
@@ -253,7 +265,7 @@ describe('External API v2 Sources CRUD', () => {
         name: 'Prometheus Metrics',
       });
 
-      const persisted = await Source.findById(response.body.data.id);
+      const persisted = await findSourceFixture(response.body.data.id);
       expect(persisted!.kind).toBe(SourceKind.Promql);
     });
 
@@ -275,7 +287,7 @@ describe('External API v2 Sources CRUD', () => {
         })
         .expect(400);
 
-      expect(await Source.findOne({ team: team._id })).toBeNull();
+      expect(sourcesRepo.list(String(team._id))).toHaveLength(0);
     });
 
     it('should return 400 for an invalid body', async () => {
@@ -294,7 +306,7 @@ describe('External API v2 Sources CRUD', () => {
     });
 
     it('should update a source', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
@@ -308,7 +320,7 @@ describe('External API v2 Sources CRUD', () => {
         name: 'Updated Log Source',
       });
 
-      const persisted = await Source.findById(logSource._id);
+      const persisted = await findSourceFixture(logSource._id);
       expect(persisted!.name).toBe('Updated Log Source');
     });
 
@@ -325,12 +337,12 @@ describe('External API v2 Sources CRUD', () => {
         .send({ ...logSourceBody(), name: 'Hijacked' })
         .expect(404);
 
-      const persisted = await Source.findById(otherTeamSource._id);
+      const persisted = await findSourceFixture(otherTeamSource._id);
       expect(persisted!.name).toBe('Other Team Source');
     });
 
     it('should return 400 for an invalid body', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
@@ -341,7 +353,7 @@ describe('External API v2 Sources CRUD', () => {
     });
 
     it('should return 400 when connection is not a valid id', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
@@ -352,7 +364,7 @@ describe('External API v2 Sources CRUD', () => {
     });
 
     it('should return 400 when connection belongs to another team', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
@@ -367,32 +379,34 @@ describe('External API v2 Sources CRUD', () => {
         })
         .expect(400);
 
-      const persisted = await Source.findById(logSource._id);
+      const persisted = await findSourceFixture(logSource._id);
       expect(persisted!.connection.toString()).toBe(connection._id.toString());
     });
 
     it('should preserve createdAt on a same-kind update', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
-      const originalCreatedAt = logSource.get('createdAt');
+      const originalCreatedAt = logSource.createdAt;
       expect(originalCreatedAt).toBeInstanceOf(Date);
 
       await authRequest('put', `${BASE_URL}/${logSource._id}`)
         .send({ ...logSourceBody(), name: 'Updated Log Source' })
         .expect(200);
 
-      const raw = await Source.collection.findOne({ _id: logSource._id });
-      expect(raw!.createdAt).toEqual(originalCreatedAt);
+      const raw = getDb()
+        .prepare('SELECT createdAt FROM sources WHERE id = ?')
+        .get(logSource._id) as { createdAt: number };
+      expect(new Date(raw.createdAt)).toEqual(originalCreatedAt);
     });
 
     it("should change a source's kind", async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
-      const originalCreatedAt = logSource.get('createdAt');
+      const originalCreatedAt = logSource.createdAt;
       expect(originalCreatedAt).toBeInstanceOf(Date);
 
       const response = await authRequest('put', `${BASE_URL}/${logSource._id}`)
@@ -405,44 +419,14 @@ describe('External API v2 Sources CRUD', () => {
         name: 'Now A Trace Source',
       });
 
-      const persisted = await Source.findById(logSource._id);
+      const persisted = await findSourceFixture(logSource._id);
       expect(persisted!.kind).toBe(SourceKind.Trace);
 
-      // The kind-change path writes through the raw collection, bypassing
-      // Mongoose casting/timestamps — assert on the raw document that
-      // createdAt survives and connection is stored as a BSON ObjectId.
-      const raw = await Source.collection.findOne({ _id: logSource._id });
-      expect(raw!.createdAt).toEqual(originalCreatedAt);
-      expect(raw!.connection).toBeInstanceOf(mongoose.Types.ObjectId);
-    });
-
-    it('should return 404 on a kind change when the source is deleted concurrently', async () => {
-      const logSource = await LogSource.create({
-        ...logSourceBody(),
-        team: team._id,
-      });
-
-      // Simulate a concurrent delete landing between the controller's findOne
-      // and the raw replaceOne in the kind-change path: the replace matches
-      // nothing, so matchedCount === 0 and the controller must report 404
-      // rather than hydrating a phantom document.
-      const spy = jest
-        .spyOn(Source.collection, 'replaceOne')
-        .mockImplementationOnce(async () => {
-          await Source.deleteOne({ _id: logSource._id });
-          return { matchedCount: 0 } as any;
-        });
-
-      try {
-        await authRequest('put', `${BASE_URL}/${logSource._id}`)
-          .send({ ...traceSourceBody(), name: 'Now A Trace Source' })
-          .expect(404);
-      } finally {
-        spy.mockRestore();
-      }
-
-      // No phantom document was written back.
-      expect(await Source.findById(logSource._id)).toBeNull();
+      const raw = getDb()
+        .prepare('SELECT createdAt,connection FROM sources WHERE id = ?')
+        .get(logSource._id) as { createdAt: number; connection: string };
+      expect(new Date(raw.createdAt)).toEqual(originalCreatedAt);
+      expect(raw.connection).toBe(connection._id);
     });
   });
 
@@ -454,14 +438,14 @@ describe('External API v2 Sources CRUD', () => {
     });
 
     it('should delete a source', async () => {
-      const logSource = await LogSource.create({
+      const logSource = await createSourceFixture({
         ...logSourceBody(),
         team: team._id,
       });
 
       await authRequest('delete', `${BASE_URL}/${logSource._id}`).expect(200);
 
-      expect(await Source.findById(logSource._id)).toBeNull();
+      expect(await findSourceFixture(logSource._id)).toBeNull();
     });
 
     it('should return 404 for a non-existent source', async () => {
@@ -478,7 +462,7 @@ describe('External API v2 Sources CRUD', () => {
         404,
       );
 
-      expect(await Source.findById(otherTeamSource._id)).not.toBeNull();
+      expect(await findSourceFixture(otherTeamSource._id)).not.toBeNull();
     });
   });
 

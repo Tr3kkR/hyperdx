@@ -43,6 +43,7 @@ import {
   pickSampleWeightExpressionProps,
   SavedChartConfig,
   SourceKind,
+  type TSource,
 } from '@hyperdx/common-utils/dist/types';
 import * as fns from 'date-fns';
 import { isString, pick } from 'lodash';
@@ -60,7 +61,7 @@ import AlertHistory, {
 } from '@/models/alertHistory';
 import { IDashboard } from '@/models/dashboard';
 import { ISavedSearch } from '@/models/savedSearch';
-import { ISource } from '@/models/source';
+type ISource = TSource & { team: string };
 import { IWebhook } from '@/models/webhook';
 import {
   isClientTimeoutOrAbortError,

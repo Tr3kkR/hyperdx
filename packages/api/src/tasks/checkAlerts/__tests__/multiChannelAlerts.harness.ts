@@ -4,12 +4,14 @@ import ms from 'ms';
 import * as config from '@/config';
 import { bulkInsertLogs } from '@/fixtures';
 import Alert from '@/models/alert';
-import Connection from '@/models/connection';
 import { SavedSearch } from '@/models/savedSearch';
-import { Source } from '@/models/source';
 import Webhook, { IWebhook } from '@/models/webhook';
 import { processAlert } from '@/tasks/checkAlerts';
 import { AlertTaskType } from '@/tasks/checkAlerts/providers';
+import {
+  createConnectionFixture,
+  createSourceFixture,
+} from '@/test/sqliteMetadata';
 
 // Shared setup for the multi-channel dispatch scenarios. Kept out of the spec
 // so each file stays under the repo's file-size limit and the scenarios read as
@@ -44,14 +46,14 @@ export const setupAlertFixtures = async (
   createTeam: (args: { name: string }) => Promise<any>,
 ) => {
   const team = await createTeam({ name: 'Test Team' });
-  const connection = await Connection.create({
+  const connection = await createConnectionFixture({
     team: team._id,
     name: 'Test Connection',
     host: config.CLICKHOUSE_HOST,
     username: config.CLICKHOUSE_USER,
     password: config.CLICKHOUSE_PASSWORD,
   });
-  const source = await Source.create({
+  const source = await createSourceFixture({
     kind: 'log',
     team: team._id,
     from: { databaseName: 'default', tableName: 'otel_logs' },
