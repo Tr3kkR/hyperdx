@@ -2,11 +2,11 @@ import _ from 'lodash';
 import { ObjectId } from 'mongodb';
 import mongoose from 'mongoose';
 
+import * as teams from '@/db/repos/teams';
+import * as users from '@/db/repos/users';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import Team from '@/models/team';
 import TeamInvite from '@/models/teamInvite';
-import User from '@/models/user';
 
 describe('team router', () => {
   const server = getServer();
@@ -43,7 +43,7 @@ describe('team router', () => {
   it('GET /team reflects isMetricsSeriesTableEnabled when set', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    await Team.findByIdAndUpdate(team._id, {
+    teams.update(team._id, {
       isMetricsSeriesTableEnabled: true,
     });
 
@@ -158,11 +158,11 @@ describe('team router', () => {
 
   it('GET /team/members', async () => {
     const { agent, team } = await getLoggedInAgent(server);
-    await User.create({
+    users.create({
       email: 'user1@example.com',
       team: team.id,
     });
-    await User.create({
+    users.create({
       email: 'user2@example.com',
       team: team.id,
     });
@@ -254,7 +254,7 @@ describe('team router', () => {
     const { agent, team } = await getLoggedInAgent(server);
 
     // Create a user with lowercase email
-    await User.create({
+    users.create({
       email: 'existinguser@example.com',
       team: team.id,
     });
@@ -320,7 +320,7 @@ describe('team router', () => {
   it('DELETE /team/member/:userId removes a user', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    const user1 = await User.create({
+    const user1 = users.create({
       email: 'user1@example.com',
       team: team.id,
     });
@@ -335,7 +335,7 @@ describe('team router', () => {
   it('DELETE /team/member/:userId updates alerts created by the removed user', async () => {
     const { agent, team, user } = await getLoggedInAgent(server);
 
-    const user1 = await User.create({
+    const user1 = users.create({
       email: 'user1@example.com',
       team: team.id,
     });
@@ -372,9 +372,7 @@ describe('team router', () => {
 
     const alertAfterUserDeletion = await Alert.findById(alert._id);
     expect(alertAfterUserDeletion).not.toBeNull();
-    expect(alertAfterUserDeletion?.createdBy?.toString()).toEqual(
-      user.id.toString(),
-    );
+    expect(alertAfterUserDeletion?.createdBy?.toString()).toEqual(user._id);
 
     // Ensure alert in another team is not modified
     const alertInAnotherTeamAfterDeletion = await Alert.findById(

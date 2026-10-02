@@ -2,6 +2,7 @@ import { MetricsDataType, SourceKind } from '@hyperdx/common-utils/dist/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 
 import * as config from '@/config';
+import * as Team from '@/db/repos/teams';
 import {
   bucketExponentialHistogramObservations,
   bulkInsertMetricsGauge,
@@ -19,7 +20,6 @@ import {
 import { McpContext } from '@/mcp/tools/types';
 import Connection from '@/models/connection';
 import { Source } from '@/models/source';
-import Team from '@/models/team';
 
 import { callTool, createTestClient, getFirstText } from './mcpTestUtils';
 

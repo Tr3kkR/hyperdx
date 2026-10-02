@@ -6,6 +6,7 @@ import { groupBy } from 'lodash';
 import { z } from 'zod';
 
 import { deleteSavedSearchAlerts } from '@/controllers/alerts';
+import { hydrateUsers } from '@/db/repos/users';
 import Alert from '@/models/alert';
 import { SavedSearch } from '@/models/savedSearch';
 import { resolveAlertDisplayFields } from '@/utils/alerts';
@@ -16,29 +17,36 @@ type SavedSearchWithoutId = Omit<z.infer<typeof SavedSearchSchema>, 'id'>;
 export async function getSavedSearches(
   teamId: string,
 ): Promise<SavedSearchListApiResponse[]> {
-  const savedSearches = await SavedSearch.find({ team: teamId })
-    .populate('createdBy', 'email name')
-    .populate('updatedBy', 'email name');
+  const savedSearches = await SavedSearch.find({ team: teamId });
   const alerts = await Alert.find(
     { team: teamId, savedSearch: { $exists: true, $ne: null } },
     { __v: 0 },
-  ).populate('createdBy', 'email name');
+  );
 
   const alertsBySavedSearchId = groupBy(alerts, 'savedSearch');
 
-  return savedSearches.map(savedSearch => ({
-    ...savedSearch.toJSON(),
+  const result = savedSearches.map(savedSearch => ({
+    ...hydrateUsers([savedSearch.toJSON()], ['createdBy', 'updatedBy'])[0],
     alerts: alertsBySavedSearchId[savedSearch._id.toString()]?.map(alert => ({
-      ...alert.toJSON(),
+      ...hydrateUsers([alert.toJSON()], ['createdBy'])[0],
       ...resolveAlertDisplayFields(alert, { savedSearch }),
     })),
   }));
+  // Mongoose's toJSON types keep ObjectId/Date even though their JSON wire values are strings.
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+  return result as unknown as SavedSearchListApiResponse[];
 }
 
-export function getSavedSearch(teamId: string, savedSearchId: string) {
-  return SavedSearch.findOne({ _id: savedSearchId, team: teamId })
-    .populate('createdBy', 'email name')
-    .populate('updatedBy', 'email name');
+export async function getSavedSearch(teamId: string, savedSearchId: string) {
+  const doc = await SavedSearch.findOne({ _id: savedSearchId, team: teamId });
+  if (!doc) return null;
+  const originalToJSON = doc.toJSON.bind(doc);
+  doc.toJSON = ((...args: Parameters<typeof doc.toJSON>) =>
+    hydrateUsers(
+      [originalToJSON(...args)],
+      ['createdBy', 'updatedBy'],
+    )[0]) as typeof doc.toJSON;
+  return doc;
 }
 
 export function createSavedSearch(

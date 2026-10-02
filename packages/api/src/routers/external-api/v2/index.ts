@@ -26,7 +26,16 @@ const defaultRateLimiter = rateLimiter({
 router.get('/', validateUserAccessKey, (req, res) => {
   res.json({
     version: 'v2',
-    user: req.user?.toJSON(),
+    user: req.user && {
+      _id: req.user._id,
+      accessKey: req.user.accessKey,
+      createdAt: req.user.createdAt,
+      email: req.user.email,
+      name: req.user.name,
+      onboardingData: req.user.onboardingData,
+      team: req.user.team,
+      updatedAt: req.user.updatedAt,
+    },
   });
 });
 

@@ -23,13 +23,13 @@ describe('utils/passport', () => {
 
   it('deserializes the session user', async () => {
     const user = { _id: 'user-id', email: 'user@example.com' };
-    mockFindUserById.mockResolvedValue(user);
+    mockFindUserById.mockReturnValue(user);
 
     expect(await deserializeSession('user-id')).toEqual({ err: null, user });
   });
 
   it('treats a deleted session user as unauthenticated, not as an error', async () => {
-    mockFindUserById.mockResolvedValue(null);
+    mockFindUserById.mockReturnValue(null);
 
     // `user: false` is what passport makes of an explicit `done(null, false)`:
     // it clears the stale id from the session and leaves the request
@@ -43,8 +43,10 @@ describe('utils/passport', () => {
   });
 
   it('still surfaces lookup failures', async () => {
-    const err = new Error('mongo is down');
-    mockFindUserById.mockRejectedValue(err);
+    const err = new Error('SQLite lookup failed');
+    mockFindUserById.mockImplementation(() => {
+      throw err;
+    });
 
     expect(await deserializeSession('user-id')).toEqual({
       err,

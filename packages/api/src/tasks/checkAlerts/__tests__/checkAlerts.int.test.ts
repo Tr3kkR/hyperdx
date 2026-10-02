@@ -14,6 +14,7 @@ import ms from 'ms';
 import * as config from '@/config';
 import { createAlert } from '@/controllers/alerts';
 import { createTeam } from '@/controllers/team';
+import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import {
   bulkInsertData,
   bulkInsertLogs,
@@ -33,7 +34,6 @@ import Connection, { IConnection } from '@/models/connection';
 import Dashboard, { IDashboard } from '@/models/dashboard';
 import { ISavedSearch, SavedSearch } from '@/models/savedSearch';
 import { ISource, LogSource, Source } from '@/models/source';
-import { ITeam } from '@/models/team';
 import Webhook, { IWebhook } from '@/models/webhook';
 import * as checkAlert from '@/tasks/checkAlerts';
 import {
@@ -2156,10 +2156,9 @@ describe('checkAlerts', () => {
       const mockUserId = new mongoose.Types.ObjectId();
       const alert = await createAlert(team._id, alertConfig, mockUserId);
 
-      const enhancedAlert: any = await Alert.findById(alert.id).populate([
-        'team',
+      const enhancedAlert: any = await Alert.findById(alert.id).populate(
         'savedSearch',
-      ]);
+      );
 
       return additionalDetails.taskType === AlertTaskType.SAVED_SEARCH
         ? {
@@ -11558,10 +11557,9 @@ describe('checkAlerts', () => {
         new mongoose.Types.ObjectId(),
       );
 
-      const enhancedAlert: any = await Alert.findById(alert.id).populate([
-        'team',
+      const enhancedAlert: any = await Alert.findById(alert.id).populate(
         'savedSearch',
-      ]);
+      );
 
       const details = {
         alert: enhancedAlert,
@@ -11684,10 +11682,9 @@ describe('checkAlerts', () => {
         mockUserId,
       );
 
-      const enhancedAlert: any = await Alert.findById(alert.id).populate([
-        'team',
+      const enhancedAlert: any = await Alert.findById(alert.id).populate(
         'savedSearch',
-      ]);
+      );
 
       const details = {
         alert: enhancedAlert,

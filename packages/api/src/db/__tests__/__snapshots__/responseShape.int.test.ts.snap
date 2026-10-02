@@ -1,0 +1,83 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Phase 1 routes retain their response bodies 1`] = `
+{
+  "/api/v2": {
+    "user": {
+      "_id": "<id>",
+      "accessKey": "<uuid>",
+      "createdAt": "<date>",
+      "email": "fake@deploysentinel.com",
+      "name": "fake@deploysentinel.com",
+      "onboardingData": {
+        "completedTasks": [],
+        "isDismissed": false,
+      },
+      "team": "<id>",
+      "updatedAt": "<date>",
+    },
+    "version": "v2",
+  },
+  "/api/v2/team": {
+    "data": {
+      "id": "<id>",
+      "name": "fake@deploysentinel.com's Team",
+    },
+  },
+  "/api/v2/team/members": {
+    "data": [
+      {
+        "email": "fake@deploysentinel.com",
+        "id": "<id>",
+        "isCurrentUser": true,
+        "name": "fake@deploysentinel.com",
+      },
+    ],
+  },
+  "/me": {
+    "accessKey": "<uuid>",
+    "aiAssistantEnabled": true,
+    "createdAt": "<date>",
+    "email": "fake@deploysentinel.com",
+    "id": "<id>",
+    "name": "fake@deploysentinel.com",
+    "onboardingData": {
+      "completedTasks": [],
+      "isDismissed": false,
+    },
+    "team": {
+      "_id": "<id>",
+      "allowedAuthMethods": [],
+      "apiKey": "<uuid>",
+      "collectorAuthenticationEnforced": true,
+      "createdAt": "<date>",
+      "hookId": "<uuid>",
+      "id": "<id>",
+      "isMetricsSeriesTableEnabled": false,
+      "name": "fake@deploysentinel.com's Team",
+      "updatedAt": "<date>",
+    },
+    "usageStatsEnabled": true,
+  },
+  "/team": {
+    "_id": "<id>",
+    "allowedAuthMethods": [],
+    "apiKey": "<uuid>",
+    "createdAt": "<date>",
+    "id": "<id>",
+    "isMetricsSeriesTableEnabled": false,
+    "name": "fake@deploysentinel.com's Team",
+  },
+  "/team/members": {
+    "data": [
+      {
+        "_id": "<id>",
+        "email": "fake@deploysentinel.com",
+        "hasPasswordAuth": true,
+        "isCurrentUser": true,
+        "name": "fake@deploysentinel.com",
+      },
+    ],
+  },
+}
+`;

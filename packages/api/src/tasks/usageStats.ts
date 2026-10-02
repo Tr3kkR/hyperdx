@@ -7,10 +7,10 @@ import pino from 'pino';
 
 import { ClickhouseClient } from '@/clickhouse';
 import * as config from '@/config';
+import * as teams from '@/db/repos/teams';
+import * as users from '@/db/repos/users';
 import Connection from '@/models/connection';
 import { Source, SourceDocument } from '@/models/source';
-import Team from '@/models/team';
-import User from '@/models/user';
 
 // Lazily construct the pino logger so the thread-stream worker isn't spawned
 // at module-load time. Importing this file (e.g. via api-app.ts during tests)
@@ -131,13 +131,8 @@ async function getUsageStats() {
   try {
     const nowInMs = Date.now();
     const [userCounts, team, chTables] = await Promise.all([
-      User.countDocuments(),
-      Team.find(
-        {},
-        {
-          _id: 1,
-        },
-      ).limit(1),
+      users.countUsers(),
+      teams.list().slice(0, 1),
       getClickhouseTableSize(),
     ]);
     const clusterId = team[0]?._id.toString();

@@ -9,7 +9,7 @@ export interface IConnection {
   name: string;
   password: string;
   username: string;
-  team: ObjectId;
+  team: ObjectId | string;
   hyperdxSettingPrefix?: string;
   /** When true, `host` is treated as a Prometheus-compatible API endpoint
    *  (e.g. Prometheus or Thanos) and PromQL queries are proxied directly to

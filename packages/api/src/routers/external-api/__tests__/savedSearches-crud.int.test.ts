@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import request, { SuperAgentTest } from 'supertest';
 
 import * as config from '@/config';
+import type { TeamDoc as ITeam } from '@/db/repos/teams';
+import type { UserDoc as IUser } from '@/db/repos/users';
 import {
   DEFAULT_DATABASE,
   DEFAULT_LOGS_TABLE,
@@ -13,8 +15,6 @@ import Alert, { AlertSource, AlertState } from '@/models/alert';
 import Connection from '@/models/connection';
 import { SavedSearch } from '@/models/savedSearch';
 import { LogSource } from '@/models/source';
-import { ITeam } from '@/models/team';
-import { IUser } from '@/models/user';
 
 const BASE_URL = '/api/v2/saved-searches';
 

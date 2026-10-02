@@ -32,7 +32,10 @@ describe('unaddressableTileAlertIds', () => {
   });
 
   // Shaped like the lean rows the manifest router passes in.
-  const alert = (dashboard: mongoose.Types.ObjectId, tileId: string) => ({
+  const alert = (
+    dashboard: string | mongoose.Types.ObjectId,
+    tileId: string,
+  ) => ({
     _id: new mongoose.Types.ObjectId(),
     source: AlertSource.TILE,
     dashboard,

@@ -1,6 +1,7 @@
 import { AlertThresholdType } from '@hyperdx/common-utils/dist/types';
 import mongoose from 'mongoose';
 
+import * as User from '@/db/repos/users';
 import {
   getLoggedInAgent,
   getServer,
@@ -9,7 +10,6 @@ import {
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
 import { SavedSearch } from '@/models/savedSearch';
-import User from '@/models/user';
 import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
 
 const MOCK_TILES = [makeTile()];

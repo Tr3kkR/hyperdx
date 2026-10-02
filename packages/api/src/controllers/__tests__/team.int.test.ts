@@ -5,6 +5,7 @@ import {
   getTeamByApiKey,
   getTeamInviteUrl,
 } from '@/controllers/team';
+import * as teams from '@/db/repos/teams';
 import { clearDBCollections, closeDB, connectDB } from '@/fixtures';
 
 describe('getTeamInviteUrl', () => {
@@ -33,9 +34,7 @@ describe('team controller', () => {
 
     expect(team.name).toBe('My Team');
 
-    team.apiKey = 'apiKey';
-
-    await team.save();
+    teams.update(team._id, { apiKey: 'apiKey' });
 
     expect(await getTeam(team._id)).toBeTruthy();
     expect(await getTeamByApiKey('apiKey')).toBeTruthy();

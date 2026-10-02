@@ -6,19 +6,20 @@ import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
 import * as config from '@/config';
+import { withTransaction } from '@/db';
+import * as teams from '@/db/repos/teams';
 import type { ObjectId } from '@/models';
 import Alert from '@/models/alert';
 import Dashboard from '@/models/dashboard';
 import { SavedSearch } from '@/models/savedSearch';
-import Team, { type ITeam, type TeamDocument } from '@/models/team';
 
 export function getTeamInviteUrl(token: string) {
   return `${config.FRONTEND_URL}/join-team?token=${token}`;
 }
 
-const LOCAL_APP_TEAM_ID = '_local_team_';
+export const LOCAL_APP_TEAM_ID = Buffer.from('_local_team_').toString('hex');
 export const LOCAL_APP_TEAM = {
-  _id: new mongoose.Types.ObjectId(LOCAL_APP_TEAM_ID),
+  _id: LOCAL_APP_TEAM_ID,
   id: LOCAL_APP_TEAM_ID,
   name: 'Local App Team',
   // Placeholder keys
@@ -36,7 +37,7 @@ export async function isTeamExisting() {
     return true;
   }
 
-  const teamCount = await Team.countDocuments({});
+  const teamCount = teams.countTeams();
   return teamCount > 0;
 }
 
@@ -47,42 +48,35 @@ export async function createTeam({
   name: string;
   collectorAuthenticationEnforced?: boolean;
 }) {
-  if (await isTeamExisting()) {
-    throw new Error('Team already exists');
-  }
-
-  const team = new Team({ name, collectorAuthenticationEnforced });
-
-  await team.save();
-
-  return team;
+  if (config.IS_LOCAL_APP_MODE) throw new Error('Team already exists');
+  return withTransaction(() => {
+    if (teams.countTeams() > 0) throw new Error('Team already exists');
+    return teams.create({ name, collectorAuthenticationEnforced });
+  });
 }
 
-export function getAllTeams(fields?: string[]) {
+export function getAllTeams(_fields?: string[]) {
   if (config.IS_LOCAL_APP_MODE) {
     return [LOCAL_APP_TEAM];
   }
 
-  return Team.find({}, fields);
+  return teams.list();
 }
 
-export function getTeam<const F extends readonly (keyof ITeam)[]>(
-  id: string | ObjectId,
-  fields: F,
-): mongoose.Query<
-  mongoose.HydratedDocument<Pick<ITeam, F[number]>> | null,
-  any
->;
-export function getTeam(
-  id: string | ObjectId,
-): mongoose.Query<TeamDocument | null, any>;
 export function getTeam(id: string | ObjectId, fields?: readonly string[]) {
   if (config.IS_LOCAL_APP_MODE) {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return LOCAL_APP_TEAM as any;
   }
 
-  return Team.findOne({}, fields);
+  // sqlite-port: Team.findOne({}) intentionally ignores the supplied id in a single-team deployment.
+  const team = teams.findTheTeam();
+  if (!team || !fields) return team;
+  return Object.fromEntries(
+    Object.entries(team).filter(
+      ([key]) => key === 'id' || fields.includes(key),
+    ),
+  ) as teams.TeamDoc;
 }
 
 export function getTeamByApiKey(apiKey: string) {
@@ -90,37 +84,23 @@ export function getTeamByApiKey(apiKey: string) {
     return LOCAL_APP_TEAM;
   }
 
-  return Team.findOne({ apiKey });
+  return teams.findByApiKey(apiKey);
 }
 
 export function rotateTeamApiKey(teamId: ObjectId) {
-  return Team.findByIdAndUpdate(teamId, { apiKey: uuidv4() }, { new: true });
+  return teams.update(String(teamId), { apiKey: uuidv4() });
 }
 
 export function setTeamName(teamId: ObjectId, name: string) {
-  return Team.findByIdAndUpdate(teamId, { name }, { new: true });
+  return teams.update(String(teamId), { name });
 }
 
 export function updateTeamClickhouseSettings(
   teamId: ObjectId,
   settings: TeamClickHouseSettingsUpdate,
 ) {
-  const $set: Record<string, any> = {};
-  const $unset: Record<string, any> = {};
-
-  for (const [key, value] of Object.entries(settings)) {
-    if (value === null) {
-      $unset[key] = '';
-    } else if (value !== undefined) {
-      $set[key] = value;
-    }
-  }
-
-  const update: Record<string, any> = {};
-  if (Object.keys($set).length > 0) update.$set = $set;
-  if (Object.keys($unset).length > 0) update.$unset = $unset;
-
-  return Team.findByIdAndUpdate(teamId, update, { new: true });
+  // sqlite-port: Mongoose $set/$unset pairs map to values and nullable columns.
+  return teams.update(String(teamId), settings as Partial<teams.TeamDoc>);
 }
 
 function getCollectionsWithTags(
@@ -152,7 +132,8 @@ export async function getTags(
   resourceType?: TagResourceType,
 ) {
   const distinctTagsPipeline: mongoose.PipelineStage[] = [
-    { $match: { team: teamId } },
+    // sqlite-port: Mongo aggregation does not cast the SQLite hex team id.
+    { $match: { team: new mongoose.Types.ObjectId(String(teamId)) } },
     { $unwind: '$tags' },
     { $group: { _id: '$tags' } },
   ];

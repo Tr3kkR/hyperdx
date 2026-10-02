@@ -2,10 +2,10 @@ import { WebhookService } from '@hyperdx/common-utils/dist/types';
 import { ObjectId } from 'mongodb';
 import request, { SuperAgentTest } from 'supertest';
 
+import type { TeamDoc as ITeam } from '@/db/repos/teams';
+import type { UserDoc as IUser } from '@/db/repos/users';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
-import { ITeam } from '@/models/team';
-import { IUser } from '@/models/user';
 import Webhook from '@/models/webhook';
 
 const WEBHOOKS_BASE_URL = '/api/v2/webhooks';
@@ -299,7 +299,7 @@ describe('External API v2 Webhooks', () => {
       // stored row (countDocuments) while data drops the unparseable one, so
       // data.length can be less than meta.total — this documents that skew.
       await Webhook.collection.insertOne({
-        team: team._id,
+        team: new ObjectId(team._id),
         name: 'Broken Webhook',
         service: 'not-a-real-service',
       } as any);

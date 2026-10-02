@@ -11,6 +11,8 @@ import { Types } from 'mongoose';
 import { z } from 'zod';
 
 import { recordOnboardingTaskCompletion } from '@/controllers/user';
+import type { UserDoc as IUser } from '@/db/repos/users';
+import { hydrateUsers } from '@/db/repos/users';
 import type { ObjectId } from '@/models';
 import Alert, {
   AlertChannel,
@@ -22,7 +24,6 @@ import Connection from '@/models/connection';
 import Dashboard, { IDashboard } from '@/models/dashboard';
 import { ISavedSearch, SavedSearch } from '@/models/savedSearch';
 import { Source } from '@/models/source';
-import { IUser } from '@/models/user';
 import Webhook from '@/models/webhook';
 import { type AlertRefs, deriveAlertDisplayFields } from '@/utils/alerts';
 import { Api400Error } from '@/utils/errors';
@@ -398,7 +399,7 @@ export const getTeamDashboardAlertsByDashboardAndTile = async (
   const alerts = await Alert.find({
     source: AlertSource.TILE,
     team: teamId,
-  }).populate('createdBy', 'email name');
+  });
   return groupBy(alerts, a => `${a.dashboard?.toString()}:${a.tileId}`);
 };
 
@@ -410,7 +411,7 @@ export const getDashboardAlertsByTile = async (
     dashboard: dashboardId,
     source: AlertSource.TILE,
     team: teamId,
-  }).populate('createdBy', 'email name');
+  });
   return groupBy(alerts, 'tileId');
 };
 
@@ -539,17 +540,22 @@ export const ALERT_PAGE_POPULATE = [
     path: 'dashboard',
     select: 'name provisioned tags tiles.id tiles.config.name',
   },
-  { path: 'createdBy', select: 'email name' },
-  { path: 'silenced.by', select: 'email' },
 ];
 
 export const getAlertEnhanced = async (
   alertId: ObjectId | string,
   teamId: ObjectId,
 ) => {
-  return Alert.findOne({ _id: alertId, team: teamId }).populate<AlertPageRefs>(
-    ALERT_PAGE_POPULATE,
-  );
+  const alert = await Alert.findOne({
+    _id: alertId,
+    team: teamId,
+  }).populate<AlertPageRefs>(ALERT_PAGE_POPULATE);
+  if (!alert) return null;
+  const plain = hydrateUsers(
+    [alert.toObject({ virtuals: true })],
+    ['createdBy', 'silenced.by'],
+  )[0];
+  return plain as typeof alert;
 };
 
 export const deleteAlert = async (id: string, teamId: ObjectId) => {

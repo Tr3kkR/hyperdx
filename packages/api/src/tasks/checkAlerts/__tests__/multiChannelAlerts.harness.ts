@@ -114,10 +114,8 @@ export const runAlert = async ({
   savedSearch: any;
   webhooks: IWebhook[];
 }) => {
-  const enhancedAlert: any = await Alert.findById(alertId).populate([
-    'team',
-    'savedSearch',
-  ]);
+  const enhancedAlert: any =
+    await Alert.findById(alertId).populate('savedSearch');
   const details: any = {
     alert: enhancedAlert,
     source,

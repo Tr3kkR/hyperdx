@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 import request, { SuperAgentTest } from 'supertest';
 
 import * as config from '@/config';
+import type { TeamDoc as ITeam } from '@/db/repos/teams';
+import type { UserDoc as IUser } from '@/db/repos/users';
 import {
   DEFAULT_DATABASE,
   DEFAULT_LOGS_TABLE,
@@ -18,8 +20,6 @@ import {
   Source,
   TraceSource,
 } from '@/models/source';
-import { ITeam } from '@/models/team';
-import { IUser } from '@/models/user';
 import {
   mapGranularityToExternalFormat,
   mapGranularityToInternalFormat,
@@ -43,7 +43,7 @@ describe('External API v2 Sources', () => {
     user = result.user;
 
     connection = await Connection.create({
-      team: team._id,
+      team: new mongoose.Types.ObjectId(team._id),
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
       username: config.CLICKHOUSE_USER,
@@ -84,7 +84,7 @@ describe('External API v2 Sources', () => {
     it('should return a single log source', async () => {
       const logSource = await LogSource.create({
         kind: SourceKind.Log,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Log Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -120,7 +120,7 @@ describe('External API v2 Sources', () => {
     it('should return a single trace source', async () => {
       const traceSource = await TraceSource.create({
         kind: SourceKind.Trace,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Trace Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -262,7 +262,7 @@ describe('External API v2 Sources', () => {
     it('should return a single metric source', async () => {
       const metricSource = await MetricSource.create({
         kind: SourceKind.Metric,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Metric Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -305,7 +305,7 @@ describe('External API v2 Sources', () => {
     it('should return a single session source', async () => {
       const traceSource = await TraceSource.create({
         kind: SourceKind.Trace,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Trace Source for Session',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -362,7 +362,7 @@ describe('External API v2 Sources', () => {
     it('should return multiple sources of different kinds', async () => {
       const logSource = await LogSource.create({
         kind: SourceKind.Log,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Logs',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -375,7 +375,7 @@ describe('External API v2 Sources', () => {
 
       const traceSource = await TraceSource.create({
         kind: SourceKind.Trace,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Traces',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -395,7 +395,7 @@ describe('External API v2 Sources', () => {
 
       const metricSource = await MetricSource.create({
         kind: SourceKind.Metric,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Metrics',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -428,7 +428,7 @@ describe('External API v2 Sources', () => {
       // Create a source for the current team
       const currentTeamSource = await LogSource.create({
         kind: SourceKind.Log,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Current Team Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -473,7 +473,7 @@ describe('External API v2 Sources', () => {
     it('should format sources according to SourceSchema', async () => {
       await LogSource.create({
         kind: SourceKind.Log,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Test Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -504,7 +504,7 @@ describe('External API v2 Sources', () => {
       // Create a valid source
       const validSource = await LogSource.create({
         kind: SourceKind.Log,
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Valid Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -520,7 +520,7 @@ describe('External API v2 Sources', () => {
       // match the SourceSchema (e.g., due to schema evolution)
       await Source.collection.insertOne({
         kind: 'invalid-kind', // Invalid kind
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         name: 'Invalid Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -542,7 +542,7 @@ describe('External API v2 Sources', () => {
       it('returns the section on a source that has one', async () => {
         const logSource = await LogSource.create({
           kind: SourceKind.Log,
-          team: team._id,
+          team: new mongoose.Types.ObjectId(team._id),
           name: 'Sectioned Log Source',
           section: SECTION,
           from: {
@@ -566,7 +566,7 @@ describe('External API v2 Sources', () => {
       it('omits the section on a source that has none', async () => {
         await LogSource.create({
           kind: SourceKind.Log,
-          team: team._id,
+          team: new mongoose.Types.ObjectId(team._id),
           name: 'Unsectioned Log Source',
           from: {
             databaseName: DEFAULT_DATABASE,
@@ -595,7 +595,7 @@ describe('External API v2 Sources', () => {
       await Source.collection.insertOne({
         kind: SourceKind.Session,
         name: 'Legacy Session',
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         connection: connection._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: 'otel_sessions' },
         traceSourceId: 'some-trace-source-id',
@@ -620,7 +620,7 @@ describe('External API v2 Sources', () => {
       await Source.collection.insertOne({
         kind: SourceKind.Trace,
         name: 'Trace with null logSourceId',
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         connection: connection._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: 'otel_traces' },
         timestampValueExpression: 'Timestamp',
@@ -650,7 +650,7 @@ describe('External API v2 Sources', () => {
       await Source.collection.insertOne({
         kind: SourceKind.Log,
         name: 'Flat Model Log',
-        team: team._id,
+        team: new mongoose.Types.ObjectId(team._id),
         connection: connection._id,
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
         timestampValueExpression: 'Timestamp',

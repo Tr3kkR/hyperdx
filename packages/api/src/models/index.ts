@@ -5,7 +5,8 @@ import * as config from '@/config';
 import { getCounter } from '@/utils/instrumentation';
 import logger from '@/utils/logger';
 
-export type ObjectId = mongoose.Types.ObjectId;
+// Until the remaining models move, callers accept persisted SQLite ids and Mongo refs.
+export type ObjectId = string | mongoose.Types.ObjectId;
 
 // Connection-lifecycle events were log-only. A counter keyed by the (bounded)
 // event name makes flapping/reconnect storms visible on a dashboard and

@@ -3,12 +3,12 @@ import { isPersistableUserId as isPersistableUserIdHex } from '@hyperdx/common-u
 import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
+import * as users from '@/db/repos/users';
 import type { ObjectId } from '@/models';
 import Alert from '@/models/alert';
-import User from '@/models/user';
 import logger from '@/utils/logger';
 export function findUserByAccessKey(accessKey: string) {
-  return User.findOne({ accessKey });
+  return users.findByAccessKey(accessKey);
 }
 
 /**
@@ -19,20 +19,20 @@ export function findUserByAccessKey(accessKey: string) {
  * requests presenting the old key start 401ing the instant this returns.
  */
 export function rotateUserAccessKey(userId: string | ObjectId) {
-  return User.findByIdAndUpdate(userId, { accessKey: uuidv4() }, { new: true });
+  return users.update(String(userId), { accessKey: uuidv4() });
 }
 
 export function findUserById(id: string) {
-  return User.findById(id);
+  return users.findById(id);
 }
 
 export function findUserByEmail(email: string) {
   // Case-insensitive email search - lowercase the email since User model stores emails in lowercase
-  return User.findOne({ email: email.toLowerCase() });
+  return users.findByEmail(email);
 }
 
 export function findUsersByTeam(team: string | ObjectId) {
-  return User.find({ team }).sort({ createdAt: 1 });
+  return users.listByTeam(String(team));
 }
 
 // Type-guard wrapper over the shared 24-hex check; rejects the synthetic
@@ -52,11 +52,8 @@ export function completeOnboardingTask(
   if (!isPersistableUserId(userId)) {
     return null;
   }
-  return User.findByIdAndUpdate(
-    userId,
-    { $addToSet: { 'onboardingData.completedTasks': taskId } },
-    { new: true },
-  );
+  // sqlite-port: $addToSet is a transactional read-modify-write in the user repository.
+  return users.addCompletedOnboardingTask(String(userId), taskId);
 }
 
 export function setOnboardingDismissed(
@@ -66,11 +63,7 @@ export function setOnboardingDismissed(
   if (!isPersistableUserId(userId)) {
     return null;
   }
-  return User.findByIdAndUpdate(
-    userId,
-    { $set: { 'onboardingData.isDismissed': isDismissed } },
-    { new: true },
-  );
+  return users.setOnboardingDismissed(String(userId), isDismissed);
 }
 
 // Fire-and-forget recording from an unrelated write path (alert/dashboard save,
@@ -84,15 +77,14 @@ export function recordOnboardingTaskCompletion(
   if (!isPersistableUserId(userId)) {
     return;
   }
-  void User.updateOne(
-    { _id: userId, 'onboardingData.completedTasks': { $ne: taskId } },
-    { $addToSet: { 'onboardingData.completedTasks': taskId } },
-  ).catch(err => {
+  try {
+    users.addCompletedOnboardingTask(String(userId), taskId);
+  } catch (err) {
     logger.warn(
       { error: err, userId: userId.toString(), taskId },
       'Failed to record onboarding task completion',
     );
-  });
+  }
 }
 
 export async function deleteTeamMember(
@@ -100,20 +92,14 @@ export async function deleteTeamMember(
   userIdToDelete: string,
   userIdRequestingDelete: string | ObjectId,
 ) {
-  const [, deletedUser] = await Promise.all([
-    Alert.updateMany(
-      { createdBy: new mongoose.Types.ObjectId(userIdToDelete), team: teamId },
-      {
-        $set: {
-          createdBy: new mongoose.Types.ObjectId(userIdRequestingDelete),
-        },
+  // sqlite-port: Mongo updateMany and findOneAndDelete must remain ordered.
+  await Alert.updateMany(
+    { createdBy: new mongoose.Types.ObjectId(userIdToDelete), team: teamId },
+    {
+      $set: {
+        createdBy: new mongoose.Types.ObjectId(String(userIdRequestingDelete)),
       },
-    ),
-    User.findOneAndDelete({
-      team: teamId,
-      _id: userIdToDelete,
-    }),
-  ]);
-
-  return deletedUser;
+    },
+  );
+  return users.deleteById(userIdToDelete, String(teamId));
 }

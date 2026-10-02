@@ -15,7 +15,7 @@ const baseAlert = {
 } as const;
 
 const makeSavedSearch = (
-  team: mongoose.Types.ObjectId,
+  team: mongoose.Types.ObjectId | string,
   fields: { name: string; tags?: string[] },
 ) =>
   new SavedSearch({

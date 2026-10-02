@@ -10,9 +10,9 @@ import path from 'path';
 
 import { closeDb, openDb } from '@/db';
 import { migrate } from '@/db/migrate';
+import * as teams from '@/db/repos/teams';
 import { connectDB, mongooseConnection } from '@/models';
 import Dashboard from '@/models/dashboard';
-import Team from '@/models/team';
 import type { HdxTask } from '@/tasks/types';
 import { ProvisionDashboardsTaskArgs } from '@/tasks/types';
 import logger from '@/utils/logger';
@@ -169,7 +169,7 @@ export default class ProvisionDashboardsTask implements HdxTask {
 
     let teamIds: string[];
     if (teamId) {
-      const teamExists = await Team.exists({ _id: teamId });
+      const teamExists = teams.findById(teamId);
       if (!teamExists) {
         logger.warn(
           { teamId },
@@ -179,8 +179,7 @@ export default class ProvisionDashboardsTask implements HdxTask {
       }
       teamIds = [teamId];
     } else {
-      const teams = await Team.find().select('_id').lean();
-      teamIds = teams.map(t => t._id.toString());
+      teamIds = teams.list().map(t => t._id);
     }
 
     for (const id of teamIds) {

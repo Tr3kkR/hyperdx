@@ -1115,7 +1115,7 @@ router.post(
 
       const source = await createSource(teamId.toString(), {
         ...req.body,
-        team: teamId.toJSON(),
+        team: String(teamId),
       });
 
       const data = formatExternalSource(source);
@@ -1220,7 +1220,7 @@ router.put(
 
       const source = await updateSource(teamId.toString(), req.params.id, {
         ...req.body,
-        team: teamId.toJSON(),
+        team: String(teamId),
       });
 
       if (source == null) {

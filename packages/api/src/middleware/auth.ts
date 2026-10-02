@@ -3,8 +3,9 @@ import type { NextFunction, Request, Response } from 'express';
 import { serializeError } from 'serialize-error';
 
 import * as config from '@/config';
+import { LOCAL_APP_TEAM_ID } from '@/controllers/team';
 import { findUserByAccessKey } from '@/controllers/user';
-import type { UserDocument } from '@/models/user';
+import type { UserDoc } from '@/db/repos/users';
 import {
   getStaticFeatureFlags,
   setBusinessContext,
@@ -17,7 +18,7 @@ declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     // eslint-disable-next-line @typescript-eslint/no-empty-object-type
-    interface User extends UserDocument {}
+    interface User extends UserDoc {}
     interface Request {
       _hdx_connection?: Connection;
     }
@@ -121,11 +122,13 @@ export function isUserAuthenticated(
     // If local app mode is enabled, skip authentication
     logger.warn('Skipping authentication in local app mode');
     req.user = {
-      // @ts-expect-error local app mode uses a synthetic string id, not an ObjectId
       _id: '_local_user_',
       email: 'local-user@hyperdx.io',
-      // @ts-expect-error local app mode uses a synthetic string team, not an ObjectId
-      team: '_local_team_',
+      team: LOCAL_APP_TEAM_ID,
+      accessKey: '',
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+      onboardingData: { completedTasks: [], isDismissed: false },
     };
     setBusinessContext({
       teamId: '_local_team_',
