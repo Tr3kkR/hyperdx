@@ -29,8 +29,8 @@ import {
   findUserByEmail,
   findUsersByTeam,
 } from '@/controllers/user';
+import * as teamInvites from '@/db/repos/teamInvites';
 import { getNonNullUserWithTeam } from '@/middleware/auth';
-import TeamInvite from '@/models/teamInvite';
 import { sendJson } from '@/utils/serialization';
 import { objectIdSchema } from '@/utils/zod';
 
@@ -170,19 +170,12 @@ router.post(
       const normalizedEmail = toEmail.toLowerCase();
 
       // Check for existing invitation with normalized email
-      let teamInvite = await TeamInvite.findOne({
-        teamId,
+      const teamInvite = teamInvites.createIfAbsent({
+        teamId: String(teamId),
+        name,
         email: normalizedEmail,
+        token: crypto.randomBytes(32).toString('hex'),
       });
-
-      if (!teamInvite) {
-        teamInvite = await new TeamInvite({
-          teamId,
-          name,
-          email: normalizedEmail,
-          token: crypto.randomBytes(32).toString('hex'),
-        }).save();
-      }
 
       res.json({
         url: getTeamInviteUrl(teamInvite.token),
@@ -200,17 +193,9 @@ router.get('/invitations', async (req, res: TeamInviteExpressRes, next) => {
     if (teamId == null) {
       throw new Error(`User ${req.user?._id} not associated with a team`);
     }
-    const teamInvites = await TeamInvite.find(
-      { teamId },
-      {
-        createdAt: 1,
-        email: 1,
-        name: 1,
-        token: 1,
-      },
-    );
+    const invites = teamInvites.listByTeam(String(teamId));
     res.json({
-      data: teamInvites.map(ti => ({
+      data: invites.map(ti => ({
         _id: ti._id.toString(),
         createdAt: ti.createdAt.toISOString(),
         email: ti.email,
@@ -233,14 +218,11 @@ router.delete(
   async (req, res, next) => {
     try {
       const id = req.params.id;
-      // Throws rather than reading `req.user?.team` directly. BSON drops an
-      // undefined value from the filter entirely, so a teamless caller would
-      // turn the scoped delete below back into the unscoped one this guard
-      // exists to prevent — any authenticated user revoking any team's
-      // pending invitation given its id.
+      // Require a team before the scoped delete; a teamless caller must not
+      // revoke another team's invitation by id.
       const { teamId } = getNonNullUserWithTeam(req);
 
-      const deleted = await TeamInvite.findOneAndDelete({ _id: id, teamId });
+      const deleted = teamInvites.deleteById(id, String(teamId));
       if (deleted == null) {
         return res.sendStatus(404);
       }

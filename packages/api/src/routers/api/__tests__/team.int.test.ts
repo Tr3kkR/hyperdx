@@ -2,11 +2,11 @@ import _ from 'lodash';
 import { ObjectId } from 'mongodb';
 import mongoose from 'mongoose';
 
+import * as teamInvites from '@/db/repos/teamInvites';
 import * as teams from '@/db/repos/teams';
 import * as users from '@/db/repos/users';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import TeamInvite from '@/models/teamInvite';
 
 describe('team router', () => {
   const server = getServer();
@@ -200,9 +200,7 @@ describe('team router', () => {
         name: 'User 3',
       })
       .expect(200);
-    const teamInvite = await TeamInvite.findOne({
-      email: 'user3@example.com',
-    });
+    const teamInvite = teamInvites.findByEmail('user3@example.com');
     if (teamInvite == null) {
       throw new Error('TeamInvite not found');
     }
@@ -221,9 +219,7 @@ describe('team router', () => {
       })
       .expect(200);
 
-    const firstInvite = await TeamInvite.findOne({
-      email: 'casesensitive@example.com',
-    });
+    const firstInvite = teamInvites.findByEmail('casesensitive@example.com');
     expect(firstInvite).not.toBeNull();
     const firstToken = firstInvite!.token;
 
@@ -237,16 +233,12 @@ describe('team router', () => {
       .expect(200);
 
     // Should reuse the same invitation (same token)
-    const secondInvite = await TeamInvite.findOne({
-      email: 'casesensitive@example.com',
-    });
+    const secondInvite = teamInvites.findByEmail('casesensitive@example.com');
     expect(secondInvite).not.toBeNull();
     expect(secondInvite!.token).toBe(firstToken);
 
     // Should only have one invitation in the database
-    const allInvites = await TeamInvite.find({
-      email: 'casesensitive@example.com',
-    });
+    const allInvites = teamInvites.listByEmail('casesensitive@example.com');
     expect(allInvites).toHaveLength(1);
   });
 
@@ -387,7 +379,7 @@ describe('team router', () => {
   it('DELETE /team/invitation/:teamInviteId', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    const invite = await TeamInvite.create({
+    const invite = teamInvites.create({
       email: 'fake_invite@example.com',
       name: 'Fake Invite',
       teamId: team.id,
@@ -406,16 +398,16 @@ describe('team router', () => {
   it('DELETE /team/invitation/:teamInviteId will not touch another team', async () => {
     const { agent } = await getLoggedInAgent(server);
 
-    const otherTeamInvite = await TeamInvite.create({
+    const otherTeamInvite = teamInvites.create({
       email: 'other_team@example.com',
       name: 'Other Team Invite',
-      teamId: new ObjectId(),
+      teamId: new ObjectId().toString(),
       token: 'other_team_token',
     });
 
     await agent.delete(`/team/invitation/${otherTeamInvite._id}`).expect(404);
 
-    expect(await TeamInvite.findById(otherTeamInvite._id)).not.toBeNull();
+    expect(teamInvites.findById(otherTeamInvite._id)).not.toBeNull();
   });
 
   it('PATCH /team/apiKey', async () => {

@@ -1,32 +1,23 @@
-import Favorite, { IFavorite } from '@/models/favorite';
+import * as favorites from '@/db/repos/favorites';
 
 export function getFavorites(userId: string, teamId: string) {
-  return Favorite.find({ user: userId, team: teamId });
+  return favorites.list(userId, teamId);
 }
 
 export function addFavorite(
   userId: string,
   teamId: string,
-  resourceType: IFavorite['resourceType'],
+  resourceType: favorites.FavoriteDoc['resourceType'],
   resourceId: string,
 ) {
-  return Favorite.findOneAndUpdate(
-    { user: userId, team: teamId, resourceType, resourceId },
-    { user: userId, team: teamId, resourceType, resourceId },
-    { upsert: true, new: true },
-  );
+  return favorites.upsert(userId, teamId, resourceType, resourceId);
 }
 
 export function removeFavorite(
   userId: string,
   teamId: string,
-  resourceType: IFavorite['resourceType'],
+  resourceType: favorites.FavoriteDoc['resourceType'],
   resourceId: string,
 ) {
-  return Favorite.deleteOne({
-    user: userId,
-    team: teamId,
-    resourceType,
-    resourceId,
-  });
+  return favorites.remove(userId, teamId, resourceType, resourceId);
 }

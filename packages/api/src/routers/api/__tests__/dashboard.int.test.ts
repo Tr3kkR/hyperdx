@@ -8,6 +8,7 @@ import {
 import { omit } from 'lodash';
 import mongoose, { Types } from 'mongoose';
 
+import * as presetFilters from '@/db/repos/presetDashboardFilters';
 import * as users from '@/db/repos/users';
 import {
   getLoggedInAgent,
@@ -18,7 +19,6 @@ import {
 } from '@/fixtures';
 import Alert, { AlertSource } from '@/models/alert';
 import Dashboard from '@/models/dashboard';
-import PresetDashboardFilter from '@/models/presetDashboardFilter';
 import { Source } from '@/models/source';
 import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
 
@@ -1788,10 +1788,22 @@ describe('dashboard router', () => {
 
     const MOCK_PRESET_DASHBOARD_FILTER = {
       name: 'Test Filter',
-      type: 'QUERY_EXPRESSION',
+      type: 'QUERY_EXPRESSION' as const,
       expression: 'service.name:test-service',
       presetDashboard: PresetDashboard.Services,
     };
+
+    const createPresetFilter = (
+      input: typeof MOCK_PRESET_DASHBOARD_FILTER & {
+        team: string | Types.ObjectId;
+        source: string | Types.ObjectId;
+      },
+    ) =>
+      presetFilters.create(String(input.team), {
+        ...input,
+        id: new Types.ObjectId().toString(),
+        source: String(input.source),
+      });
 
     describe('GET /preset/:presetDashboard/filters', () => {
       it('returns preset dashboard filters for a given source', async () => {
@@ -1802,7 +1814,7 @@ describe('dashboard router', () => {
         });
 
         // Create a preset dashboard filter
-        const filter = await PresetDashboardFilter.create({
+        const filter = await createPresetFilter({
           ...MOCK_PRESET_DASHBOARD_FILTER,
           team: team._id,
           source: source._id,
@@ -1876,13 +1888,13 @@ describe('dashboard router', () => {
           team: team2,
         });
 
-        await PresetDashboardFilter.create({
+        await createPresetFilter({
           ...MOCK_PRESET_DASHBOARD_FILTER,
           team: team._id,
           source: source1._id,
         });
 
-        await PresetDashboardFilter.create({
+        await createPresetFilter({
           ...MOCK_PRESET_DASHBOARD_FILTER,
           team: team2,
           source: source2._id,
@@ -1924,7 +1936,7 @@ describe('dashboard router', () => {
         });
 
         // Verify filter was created in database
-        const filters = await PresetDashboardFilter.find({ team: team._id });
+        const filters = await presetFilters.listByTeam(String(team._id));
         expect(filters).toHaveLength(1);
         expect(filters[0]._id.toString()).toBe(response.body.id);
         expect(filters[0].source.toString()).toBe(source._id.toString());
@@ -2062,7 +2074,7 @@ describe('dashboard router', () => {
         });
 
         // Create initial filter
-        const existingFilter = await PresetDashboardFilter.create({
+        const existingFilter = await createPresetFilter({
           ...MOCK_PRESET_DASHBOARD_FILTER,
           team: team._id,
           source: source._id,
@@ -2088,9 +2100,7 @@ describe('dashboard router', () => {
         });
 
         // Verify filter was updated in database
-        const updatedFilter = await PresetDashboardFilter.findById(
-          existingFilter._id,
-        );
+        const updatedFilter = await presetFilters.findById(existingFilter._id);
         expect(updatedFilter?.name).toBe('Updated Filter Name');
         expect(updatedFilter?.expression).toBe('service.name:updated-service');
       });
@@ -2122,7 +2132,7 @@ describe('dashboard router', () => {
           team: team._id,
         });
 
-        const existingFilter = await PresetDashboardFilter.create({
+        const existingFilter = await createPresetFilter({
           ...MOCK_PRESET_DASHBOARD_FILTER,
           team: team._id,
           source: source._id,
@@ -2190,7 +2200,7 @@ describe('dashboard router', () => {
         });
 
         // Create a filter to delete
-        const filter = await PresetDashboardFilter.create({
+        const filter = await createPresetFilter({
           ...MOCK_PRESET_DASHBOARD_FILTER,
           team: team._id,
           source: source._id,
@@ -2207,7 +2217,7 @@ describe('dashboard router', () => {
         });
 
         // Verify filter was deleted from database
-        const deletedFilter = await PresetDashboardFilter.findById(filter._id);
+        const deletedFilter = await presetFilters.findById(filter._id);
         expect(deletedFilter).toBeNull();
       });
 
@@ -2243,7 +2253,7 @@ describe('dashboard router', () => {
           team: team2Id,
         });
 
-        const filter = await PresetDashboardFilter.create({
+        const filter = await createPresetFilter({
           ...MOCK_PRESET_DASHBOARD_FILTER,
           team: team2Id,
           source: source._id,
@@ -2257,9 +2267,7 @@ describe('dashboard router', () => {
           .expect(404);
 
         // Verify filter still exists for team2
-        const stillExistingFilter = await PresetDashboardFilter.findById(
-          filter._id,
-        );
+        const stillExistingFilter = await presetFilters.findById(filter._id);
         expect(stillExistingFilter).toBeTruthy();
       });
     });
