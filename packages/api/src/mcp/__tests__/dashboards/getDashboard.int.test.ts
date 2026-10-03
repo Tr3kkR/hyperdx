@@ -1,5 +1,5 @@
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
-import Dashboard from '@/models/dashboard';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
 
 import { setupDashboardTests } from './setup';
 
@@ -10,18 +10,18 @@ describe('MCP Dashboard Tools - clickstack_get_dashboard', () => {
   // Replace bare `team` with `ctx.team`, `client` with `ctx.client!`, etc.
 
   it('should list all dashboards when no id provided', async () => {
-    await new Dashboard({
+    createDashboardFixture({
       name: 'Dashboard 1',
       tiles: [],
       team: ctx.team._id,
       tags: ['tag1'],
-    }).save();
-    await new Dashboard({
+    });
+    createDashboardFixture({
       name: 'Dashboard 2',
       tiles: [],
       team: ctx.team._id,
       tags: ['tag2'],
-    }).save();
+    });
 
     const result = await callTool(ctx.client!, 'clickstack_get_dashboard', {});
 
@@ -34,12 +34,12 @@ describe('MCP Dashboard Tools - clickstack_get_dashboard', () => {
   });
 
   it('should get dashboard detail when id is provided', async () => {
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'My Dashboard',
       tiles: [],
       team: ctx.team._id,
       tags: ['test'],
-    }).save();
+    });
 
     const result = await callTool(ctx.client!, 'clickstack_get_dashboard', {
       id: dashboard._id.toString(),
@@ -56,7 +56,7 @@ describe('MCP Dashboard Tools - clickstack_get_dashboard', () => {
   it('returns a static list filter saved outside MCP, with a derived variable name', async () => {
     // Seeded directly through the model, i.e. as the UI/REST API persists it,
     // to prove readability does not depend on the MCP save path.
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'Static filter dashboard',
       tiles: [],
       team: ctx.team._id,
@@ -70,7 +70,7 @@ describe('MCP Dashboard Tools - clickstack_get_dashboard', () => {
           isVariableEnabled: true,
         },
       ],
-    }).save();
+    });
 
     const result = await callTool(ctx.client!, 'clickstack_get_dashboard', {
       id: dashboard._id.toString(),

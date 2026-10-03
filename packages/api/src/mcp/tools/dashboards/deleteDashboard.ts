@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import { deleteDashboard } from '@/controllers/dashboard';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpUserError } from '@/mcp/utils/errors';
-import Dashboard from '@/models/dashboard';
 import { objectIdSchema } from '@/utils/zod';
 
 export function registerDeleteDashboard({
@@ -26,10 +26,7 @@ export function registerDeleteDashboard({
       }),
     },
     async ({ id: dashboardId }) => {
-      const existing = await Dashboard.findOne({
-        _id: dashboardId,
-        team: teamId,
-      }).lean();
+      const existing = dashboardsRepo.findById(dashboardId, teamId);
       if (!existing) {
         return mcpUserError('Dashboard not found');
       }

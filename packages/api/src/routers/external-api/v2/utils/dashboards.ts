@@ -49,7 +49,9 @@ import { z } from 'zod';
 import { deleteDashboardAlerts } from '@/controllers/alerts';
 import { getConnectionsByTeam } from '@/controllers/connection';
 import { getSources } from '@/controllers/sources';
-import Dashboard, { DashboardDocument } from '@/models/dashboard';
+import type { DashboardDoc } from '@/db/repos/dashboards';
+import * as dashboardsRepo from '@/db/repos/dashboards';
+import type { DashboardDocument } from '@/models/dashboard';
 import {
   translateExternalChartToTileConfig,
   translateExternalFilterToFilter,
@@ -617,7 +619,20 @@ function convertTileToExternalChart(
 }
 
 export function convertToExternalDashboard(
-  dashboard: DashboardDocument,
+  dashboard:
+    | Pick<
+        DashboardDoc,
+        | '_id'
+        | 'name'
+        | 'tiles'
+        | 'tags'
+        | 'filters'
+        | 'savedQuery'
+        | 'savedQueryLanguage'
+        | 'savedFilterValues'
+        | 'containers'
+      >
+    | DashboardDocument,
 ): ExternalDashboard {
   const containers = dashboard.containers ?? [];
   // Dedupe by id when building the lookup map: a doc with duplicate
@@ -1272,10 +1287,9 @@ async function getMissingOnClickDashboards(
 
   if (dashboardIds.size === 0) return [];
 
-  const existingDashboards = await Dashboard.find(
-    { team, _id: { $in: [...dashboardIds] } },
-    { _id: 1 },
-  ).lean();
+  const existingDashboards = dashboardsRepo
+    .findManyByIds([...dashboardIds])
+    .filter(d => d.team === String(team));
   const existingDashboardIds = new Set(
     existingDashboards.map(d => d._id.toString()),
   );

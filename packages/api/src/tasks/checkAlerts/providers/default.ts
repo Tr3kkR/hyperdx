@@ -17,8 +17,12 @@ import { LOCAL_APP_TEAM } from '@/controllers/team';
 import { closeDb, openDb } from '@/db';
 import { migrate } from '@/db/migrate';
 import * as connectionsRepo from '@/db/repos/connections';
+import * as dashboardsRepo from '@/db/repos/dashboards';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import type { SourceDoc } from '@/db/repos/sources';
 import * as sourcesRepo from '@/db/repos/sources';
+import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
+import * as webhooksRepo from '@/db/repos/webhooks';
 import { pruneExpired } from '@/db/retention';
 import { connectDB, mongooseConnection, ObjectId } from '@/models';
 import Alert, {
@@ -31,9 +35,6 @@ import AlertHistory, {
   IAlertHistory,
   IAlertHistoryAnalytics,
 } from '@/models/alertHistory';
-import Dashboard from '@/models/dashboard';
-import { type ISavedSearch, SavedSearch } from '@/models/savedSearch';
-import Webhook, { IWebhook } from '@/models/webhook';
 import {
   AggregatedAlertHistory,
   getConsecutiveWindowHistories,
@@ -45,6 +46,7 @@ import {
   type AlertProvider,
   type AlertTask,
   AlertTaskType,
+  type SavedSearchLike,
 } from '@/tasks/checkAlerts/providers';
 import { MappedOmit } from '@/tasks/types';
 import { convertMsToGranularityString } from '@/utils/common';
@@ -56,10 +58,10 @@ async function getSavedSearchDetails(
   alert: IAlert,
 ): Promise<[AlertConnection, PartialAlertDetails] | []> {
   const savedSearchId = alert.savedSearch;
-  const savedSearch = await SavedSearch.findOne({
-    _id: savedSearchId,
-    team: alert.team,
-  });
+  const savedSearch = savedSearchesRepo.findById(
+    String(savedSearchId),
+    String(alert.team),
+  );
 
   if (!savedSearch) {
     logger.error({
@@ -150,10 +152,10 @@ async function getTileDetails(
   const dashboardId = alert.dashboard;
   const tileId = alert.tileId;
 
-  const dashboard = await Dashboard.findOne({
-    _id: dashboardId,
-    team: alert.team,
-  });
+  const dashboard = dashboardsRepo.findById(
+    String(dashboardId),
+    String(alert.team),
+  );
   if (!dashboard) {
     logger.error({
       message: 'dashboard not found',
@@ -464,7 +466,7 @@ export default class DefaultAlertProvider implements AlertProvider {
     startTime,
   }: {
     endTime: Date;
-    savedSearch: ISavedSearch;
+    savedSearch: SavedSearchLike;
     startTime: Date;
   }): string {
     const url = new URL(`${config.FRONTEND_URL}/search/${savedSearch.id}`);
@@ -670,9 +672,7 @@ export default class DefaultAlertProvider implements AlertProvider {
   }
 
   async getWebhooks(teamId: string | ObjectId) {
-    const webhooks = await Webhook.find({
-      team: new mongoose.Types.ObjectId(teamId),
-    });
+    const webhooks = webhooksRepo.list(String(teamId));
     return new Map<string, IWebhook>(webhooks.map(w => [w.id, w]));
   }
 

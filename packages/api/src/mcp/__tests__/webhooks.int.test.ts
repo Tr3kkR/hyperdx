@@ -4,7 +4,11 @@ import * as Team from '@/db/repos/teams';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
 import Alert from '@/models/alert';
-import Webhook, { WebhookService } from '@/models/webhook';
+import { WebhookService } from '@/models/webhook';
+import {
+  createWebhookFixture,
+  findWebhookFixture,
+} from '@/test/sqliteMetadata';
 
 import { callTool, createTestClient, getFirstText } from './mcpTestUtils';
 
@@ -58,7 +62,7 @@ describe('MCP Webhook Tools', () => {
       // Never echo the URL back (write-only posture, mirrors get_webhook).
       expect(output.url).toBeUndefined();
 
-      const stored = await Webhook.findById(output.id);
+      const stored = await findWebhookFixture(output.id);
       expect(stored).not.toBeNull();
       expect(stored?.team.toString()).toBe(team._id.toString());
       expect(stored?.url).toBe('https://example.com/webhook');
@@ -109,7 +113,7 @@ describe('MCP Webhook Tools', () => {
     });
 
     it('rejects a duplicate (team, service, name)', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         team: team._id,
         name: 'Dup Hook',
         service: WebhookService.Generic,
@@ -129,7 +133,7 @@ describe('MCP Webhook Tools', () => {
 
   describe('clickstack_save_webhook (update)', () => {
     async function createGenericWebhook() {
-      return Webhook.create({
+      return createWebhookFixture({
         team: team._id,
         name: 'Original',
         service: WebhookService.Generic,
@@ -154,12 +158,12 @@ describe('MCP Webhook Tools', () => {
       expect(output.id).toBe(wh._id.toString());
       expect(output.name).toBe('Renamed');
 
-      const stored = await Webhook.findById(wh._id);
+      const stored = await findWebhookFixture(wh._id);
       expect(stored?.name).toBe('Renamed');
       // description omitted -> cleared (full replace of readable fields)
       expect(stored?.description == null).toBe(true);
       // headers omitted + destination unchanged -> preserved
-      expect(stored?.headers?.get('X-Token')).toBe('secret');
+      expect(stored?.headers?.['X-Token']).toBe('secret');
     });
 
     it('clears omitted write-only secrets when the destination changes', async () => {
@@ -173,11 +177,11 @@ describe('MCP Webhook Tools', () => {
       });
 
       expect(result.isError).toBeFalsy();
-      const stored = await Webhook.findById(wh._id);
+      const stored = await findWebhookFixture(wh._id);
       expect(stored?.url).toBe('https://example.com/NEW-destination');
       // headers omitted + destination changed -> cleared (no secret forwarding)
       const headers = stored?.headers;
-      expect(headers == null || headers.size === 0).toBe(true);
+      expect(headers == null || Object.keys(headers).length === 0).toBe(true);
     });
 
     // NOTE: the 'conflict' branch of updateWebhook fires only when url/service
@@ -188,13 +192,13 @@ describe('MCP Webhook Tools', () => {
     // unit test that injects a write between the two awaits.
 
     it('rejects renaming a webhook onto an existing (service, name)', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         team: team._id,
         name: 'Existing Name',
         service: WebhookService.Generic,
         url: 'https://example.com/a',
       });
-      const target = await Webhook.create({
+      const target = await createWebhookFixture({
         team: team._id,
         name: 'Other Name',
         service: WebhookService.Generic,
@@ -252,7 +256,7 @@ describe('MCP Webhook Tools', () => {
 
   describe('clickstack_delete_webhook', () => {
     it('deletes a webhook', async () => {
-      const wh = await Webhook.create({
+      const wh = await createWebhookFixture({
         team: team._id,
         name: 'To Delete',
         service: WebhookService.Generic,
@@ -267,11 +271,11 @@ describe('MCP Webhook Tools', () => {
       const output = JSON.parse(getFirstText(result));
       expect(output).toMatchObject({ deleted: true, id: wh._id.toString() });
 
-      expect(await Webhook.findById(wh._id)).toBeNull();
+      expect(await findWebhookFixture(wh._id)).toBeNull();
     });
 
     it('blocks deletion when an alert references the webhook', async () => {
-      const wh = await Webhook.create({
+      const wh = await createWebhookFixture({
         team: team._id,
         name: 'Referenced',
         service: WebhookService.Generic,
@@ -293,7 +297,7 @@ describe('MCP Webhook Tools', () => {
       expect(result.isError).toBe(true);
       expect(getFirstText(result)).toContain('still reference it');
       // Not deleted.
-      expect(await Webhook.findById(wh._id)).not.toBeNull();
+      expect(await findWebhookFixture(wh._id)).not.toBeNull();
     });
 
     it('returns a user error for a non-existent id', async () => {
@@ -307,7 +311,7 @@ describe('MCP Webhook Tools', () => {
 
     it('does not delete a webhook owned by another team', async () => {
       const otherTeam = await Team.create({ name: 'Other Team' });
-      const otherWebhook = await Webhook.create({
+      const otherWebhook = await createWebhookFixture({
         team: otherTeam._id,
         name: 'Other Team Hook',
         service: WebhookService.Generic,
@@ -321,7 +325,7 @@ describe('MCP Webhook Tools', () => {
       expect(result.isError).toBe(true);
       expect(getFirstText(result)).toContain('not found');
       // Still present.
-      expect(await Webhook.findById(otherWebhook._id)).not.toBeNull();
+      expect(await findWebhookFixture(otherWebhook._id)).not.toBeNull();
     });
   });
 });

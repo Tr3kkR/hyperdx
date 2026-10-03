@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
+import * as webhooksRepo from '@/db/repos/webhooks';
 import type { ToolRegistrar } from '@/mcp/tools/types';
-import Webhook from '@/models/webhook';
 
 export function registerGetWebhook({
   context,
@@ -21,7 +21,7 @@ export function registerGetWebhook({
       inputSchema: z.object({}),
     },
     async () => {
-      const webhooks = await Webhook.find({ team: teamId });
+      const webhooks = webhooksRepo.list(teamId);
 
       const output = webhooks.map(wh => ({
         id: wh._id.toString(),

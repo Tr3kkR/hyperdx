@@ -3,9 +3,9 @@ import { z } from 'zod';
 
 import * as config from '@/config';
 import { getDashboards } from '@/controllers/dashboard';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpUserError, validateObjectId } from '@/mcp/utils/errors';
-import Dashboard from '@/models/dashboard';
 import { convertToExternalDashboard } from '@/routers/external-api/v2/utils/dashboards';
 
 import { withResolvedFilterVariableNames } from './variables';
@@ -55,7 +55,7 @@ export function registerGetDashboard({
       const idError = validateObjectId(id, 'dashboard ID');
       if (idError) return idError;
 
-      const dashboard = await Dashboard.findOne({ _id: id, team: teamId });
+      const dashboard = dashboardsRepo.findById(id, teamId);
       if (!dashboard) {
         return mcpUserError('Dashboard not found');
       }

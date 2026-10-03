@@ -10,7 +10,7 @@ import {
   updateSavedSearch,
 } from '@/controllers/savedSearch';
 import { getSource } from '@/controllers/sources';
-import { SavedSearch } from '@/models/savedSearch';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import { processRequestWithEnhancedErrors as validateRequest } from '@/utils/enhancedErrors';
 import {
   getPagination,
@@ -379,18 +379,16 @@ router.get(
       }
 
       const { limit, offset } = getPagination(req.query);
-      const filter = { team: teamId.toString() };
-      // Sort by _id so skip/offset paging is stable across requests.
       const [savedSearches, total] = await Promise.all([
-        SavedSearch.find(filter).sort({ _id: 1 }).skip(offset).limit(limit),
-        SavedSearch.countDocuments(filter),
+        savedSearchesRepo.page(teamId.toString(), limit, offset),
+        savedSearchesRepo.count(teamId.toString()),
       ]);
 
       // Surface the full count at the HTTP layer too, so a client that reads
       // headers but not the `meta` body can still detect truncation.
       res.set('X-Total-Count', String(total));
       return res.json({
-        data: savedSearches.map(s => s.toExternalJSON()),
+        data: savedSearches.map(savedSearchesRepo.toExternalJSON),
         meta: paginationMeta({ limit, offset }, total, 'saved-searches'),
       });
     } catch (e) {
@@ -460,7 +458,7 @@ router.get(
         return res.status(404).json({ message: 'Saved search not found' });
       }
 
-      res.json({ data: savedSearch.toExternalJSON() });
+      res.json({ data: savedSearchesRepo.toExternalJSON(savedSearch) });
     } catch (e) {
       next(e);
     }
@@ -533,7 +531,7 @@ router.post(
         userId?.toString(),
       );
 
-      res.json({ data: savedSearch.toExternalJSON() });
+      res.json({ data: savedSearchesRepo.toExternalJSON(savedSearch) });
     } catch (e) {
       next(e);
     }
@@ -620,10 +618,10 @@ router.put(
       // Read only the stored filters for the grandfather check — a lean,
       // projected query, not the fully-populated getSavedSearch (which also
       // populates createdBy/updatedBy we don't need here).
-      const existing = await SavedSearch.findOne(
-        { _id: req.params.id, team: teamId.toString() },
-        { filters: 1 },
-      ).lean();
+      const existing = savedSearchesRepo.findById(
+        req.params.id,
+        teamId.toString(),
+      );
       if (existing == null) {
         return res.status(404).json({ message: 'Saved search not found' });
       }
@@ -648,7 +646,7 @@ router.put(
         return res.status(404).json({ message: 'Saved search not found' });
       }
 
-      res.json({ data: savedSearch.toExternalJSON() });
+      res.json({ data: savedSearchesRepo.toExternalJSON(savedSearch) });
     } catch (e) {
       next(e);
     }

@@ -1,12 +1,17 @@
 import * as users from '@/db/repos/users';
+import type { WebhookDoc } from '@/db/repos/webhooks';
 import {
   getLoggedInAgent,
   getServer,
   makeSavedSearchAlertInput,
 } from '@/fixtures';
 import Alert from '@/models/alert';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
+import { WebhookService } from '@/models/webhook';
+import { createWebhookFixture } from '@/test/sqliteMetadata';
+import {
+  findSavedSearchFixture,
+  setSavedSearchUpdatedByFixture,
+} from '@/test/sqliteMetadata';
 
 const MOCK_SAVED_SEARCH = {
   name: 'error',
@@ -23,7 +28,7 @@ describe('savedSearch router', () => {
   let agent: Awaited<ReturnType<typeof getLoggedInAgent>>['agent'];
   let team: Awaited<ReturnType<typeof getLoggedInAgent>>['team'];
   let user: Awaited<ReturnType<typeof getLoggedInAgent>>['user'];
-  let webhook: WebhookDocument;
+  let webhook: WebhookDoc;
 
   beforeAll(async () => {
     await server.start();
@@ -34,7 +39,7 @@ describe('savedSearch router', () => {
     agent = result.agent;
     team = result.team;
     user = result.user;
-    webhook = await Webhook.create({
+    webhook = await createWebhookFixture({
       name: 'Test Webhook',
       service: WebhookService.Slack,
       url: 'https://hooks.slack.com/test',
@@ -158,9 +163,7 @@ describe('savedSearch router', () => {
     });
 
     // Simulate a different user updating the saved search
-    await SavedSearch.findByIdAndUpdate(created.body._id, {
-      updatedBy: secondUser._id,
-    });
+    setSavedSearchUpdatedByFixture(created.body._id, secondUser._id);
 
     const savedSearches = await agent.get('/saved-search').expect(200);
     const savedSearch = savedSearches.body.find(
@@ -184,7 +187,7 @@ describe('savedSearch router', () => {
       .expect(200);
 
     // Verify updatedBy is still set in the DB
-    const dbRecord = await SavedSearch.findById(created.body._id);
+    const dbRecord = await findSavedSearchFixture(created.body._id);
     expect(dbRecord?.updatedBy?.toString()).toBe(user._id.toString());
     expect(dbRecord?.createdBy?.toString()).toBe(user._id.toString());
   });

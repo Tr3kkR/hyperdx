@@ -1,9 +1,7 @@
-import { escapeRegExp } from 'lodash';
-
 import * as config from '@/config';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpServerError, mcpUserError } from '@/mcp/utils/errors';
-import Dashboard from '@/models/dashboard';
 import logger from '@/utils/logger';
 
 import { mcpSearchDashboardsSchema } from './schemas';
@@ -38,20 +36,13 @@ export function registerSearchDashboards({
         );
       }
 
-      const filter: Record<string, unknown> = { team: teamId };
-
-      if (hasQuery) {
-        filter.name = { $regex: escapeRegExp(query), $options: 'i' };
-      }
-      if (hasTags) {
-        filter.tags = { $all: tags };
-      }
-
       try {
-        const dashboards = await Dashboard.find(filter)
-          .select({ name: 1, tags: 1 })
-          .limit(SEARCH_RESULTS_LIMIT + 1)
-          .lean();
+        const dashboards = dashboardsRepo.search(
+          teamId,
+          hasQuery ? query : undefined,
+          hasTags ? tags : undefined,
+          SEARCH_RESULTS_LIMIT + 1,
+        );
 
         const truncated = dashboards.length > SEARCH_RESULTS_LIMIT;
         const results = truncated

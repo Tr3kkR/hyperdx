@@ -15,10 +15,11 @@ import {
   getTeamDashboardAlertsByDashboardAndTile,
 } from '@/controllers/alerts';
 import { recordOnboardingTaskCompletion } from '@/controllers/user';
+import type { DashboardDoc } from '@/db/repos/dashboards';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import { hydrateUsers } from '@/db/repos/users';
 import type { ObjectId } from '@/models';
 import type { AlertDocument, IAlert } from '@/models/alert';
-import Dashboard, { IDashboard } from '@/models/dashboard';
 import { resolveAlertDisplayFields } from '@/utils/alerts';
 
 function pickAlertsByTile(tiles: Tile[]) {
@@ -83,7 +84,7 @@ function extractTileAlertData(tiles: TileForAlertSync[]): {
 }
 
 async function syncDashboardAlerts(
-  dashboard: Pick<IDashboard, '_id' | 'name' | 'tags' | 'tiles'>,
+  dashboard: Pick<DashboardDoc, '_id' | 'name' | 'tags' | 'tiles'>,
   teamId: ObjectId,
   oldTiles: TileForAlertSync[],
   newTiles: Tile[],
@@ -137,7 +138,7 @@ async function syncDashboardAlerts(
  */
 function withResolvedDisplayFields(
   alert: AlertDocument | undefined,
-  dashboard: Pick<IDashboard, 'name' | 'tags' | 'tiles'>,
+  dashboard: Pick<DashboardDoc, 'name' | 'tags' | 'tiles'>,
 ) {
   if (alert == null) {
     return undefined;
@@ -150,14 +151,11 @@ function withResolvedDisplayFields(
 
 export async function getDashboards(teamId: ObjectId) {
   const [_dashboards, alerts] = await Promise.all([
-    Dashboard.find({ team: teamId }),
+    dashboardsRepo.list(String(teamId)),
     getTeamDashboardAlertsByDashboardAndTile(teamId),
   ]);
 
-  const dashboards = hydrateUsers(
-    _dashboards.map(d => d.toJSON()),
-    ['createdBy', 'updatedBy'],
-  )
+  const dashboards = hydrateUsers(_dashboards, ['createdBy', 'updatedBy'])
     .map(d => ({
       ...d,
       tiles: d.tiles.map(t => ({
@@ -178,7 +176,7 @@ export async function getDashboards(teamId: ObjectId) {
 
 export async function getDashboard(dashboardId: string, teamId: ObjectId) {
   const [_dashboard, alerts] = await Promise.all([
-    Dashboard.findOne({ _id: dashboardId, team: teamId }),
+    dashboardsRepo.findById(dashboardId, String(teamId)),
     getDashboardAlertsByTile(teamId, dashboardId),
   ]);
 
@@ -187,7 +185,7 @@ export async function getDashboard(dashboardId: string, teamId: ObjectId) {
   }
 
   return healLegacyDashboardTileColors({
-    ...hydrateUsers([_dashboard.toJSON()], ['createdBy', 'updatedBy'])[0],
+    ...hydrateUsers([_dashboard], ['createdBy', 'updatedBy'])[0],
     tiles: _dashboard.tiles.map(t => ({
       ...t,
       config: {
@@ -203,12 +201,11 @@ export async function createDashboard(
   dashboard: z.infer<typeof DashboardWithoutIdSchema>,
   userId?: ObjectId,
 ) {
-  const newDashboard = await new Dashboard({
+  const newDashboard = dashboardsRepo.create(String(teamId), {
     ...dashboard,
-    team: teamId,
-    createdBy: userId,
-    updatedBy: userId,
-  }).save();
+    createdBy: userId?.toString(),
+    updatedBy: userId?.toString(),
+  });
 
   await createOrUpdateDashboardAlerts(
     newDashboard,
@@ -223,10 +220,7 @@ export async function createDashboard(
 }
 
 export async function deleteDashboard(dashboardId: string, teamId: ObjectId) {
-  const dashboard = await Dashboard.findOneAndDelete({
-    _id: dashboardId,
-    team: teamId,
-  });
+  const dashboard = dashboardsRepo.remove(dashboardId, String(teamId));
   if (dashboard) {
     await deleteDashboardAlerts(dashboardId, teamId);
   }
@@ -244,18 +238,11 @@ export async function updateDashboard(
     throw new Error('Dashboard not found');
   }
 
-  const updatedDashboard = await Dashboard.findOneAndUpdate(
-    {
-      _id: dashboardId,
-      team: teamId,
-    },
-    {
-      ...updates,
-      tags: updates.tags && uniq(updates.tags),
-      updatedBy: userId,
-    },
-    { new: true },
-  );
+  const updatedDashboard = dashboardsRepo.update(dashboardId, String(teamId), {
+    ...updates,
+    tags: updates.tags && uniq(updates.tags),
+    updatedBy: userId?.toString(),
+  });
   if (updatedDashboard == null) {
     throw new Error('Could not update dashboard');
   }

@@ -10,9 +10,9 @@ import path from 'path';
 
 import { closeDb, openDb } from '@/db';
 import { migrate } from '@/db/migrate';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as teams from '@/db/repos/teams';
 import { connectDB, mongooseConnection } from '@/models';
-import Dashboard from '@/models/dashboard';
 import type { HdxTask } from '@/tasks/types';
 import { ProvisionDashboardsTaskArgs } from '@/tasks/types';
 import logger from '@/utils/logger';
@@ -76,11 +76,10 @@ export async function syncDashboards(teamId: string, dir: string) {
 
   for (const dashboard of dashboards) {
     try {
-      const userDashboard = await Dashboard.exists({
-        name: dashboard.name,
-        team: teamId,
-        provisioned: { $ne: true },
-      });
+      const userDashboard = dashboardsRepo.hasUnprovisionedName(
+        teamId,
+        dashboard.name,
+      );
       if (userDashboard) {
         logger.warn(
           { name: dashboard.name },
@@ -88,28 +87,9 @@ export async function syncDashboards(teamId: string, dir: string) {
         );
       }
 
-      const result = await Dashboard.findOneAndUpdate(
-        { name: dashboard.name, team: teamId, provisioned: true },
-        {
-          $set: {
-            tiles: dashboard.tiles || [],
-            tags: dashboard.tags || [],
-            filters: dashboard.filters || [],
-            savedQuery: dashboard.savedQuery ?? null,
-            savedQueryLanguage: dashboard.savedQueryLanguage ?? null,
-            savedFilterValues: dashboard.savedFilterValues || [],
-            containers: dashboard.containers || [],
-          },
-          $setOnInsert: {
-            name: dashboard.name,
-            team: teamId,
-            provisioned: true,
-          },
-        },
-        { upsert: true, new: false },
-      );
+      const result = dashboardsRepo.upsertProvisioned(teamId, dashboard);
 
-      if (result === null) {
+      if (result.created) {
         logger.info({ name: dashboard.name }, 'Created provisioned dashboard');
       }
     } catch (err) {

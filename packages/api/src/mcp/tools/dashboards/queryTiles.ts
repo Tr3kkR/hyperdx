@@ -1,10 +1,10 @@
 import PQueue from '@esm2cjs/p-queue';
 import { z } from 'zod';
 
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import { parseTimeRange, runConfigTile } from '@/mcp/tools/query/helpers';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpUserError } from '@/mcp/utils/errors';
-import Dashboard from '@/models/dashboard';
 import {
   convertToExternalDashboard,
   isConfigTile,
@@ -228,10 +228,7 @@ export function registerQueryTiles({
       }
       const { startDate, endDate } = timeRange;
 
-      const dashboard = await Dashboard.findOne({
-        _id: dashboardId,
-        team: teamId,
-      });
+      const dashboard = dashboardsRepo.findById(dashboardId, teamId);
       if (!dashboard) {
         return mcpUserError('Dashboard not found');
       }

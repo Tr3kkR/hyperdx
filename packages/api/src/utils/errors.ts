@@ -57,9 +57,13 @@ export const isOperationalError = (error: Error) => {
   return false;
 };
 
-// MongoDB duplicate-key error (unique-index violation). Used to translate a
-// racing or colliding write into a 400 instead of a generic 500.
+// A unique-index violation becomes a user-facing collision rather than a 500.
 export const isDuplicateKeyError = (e: unknown): boolean =>
   e != null &&
   typeof e === 'object' &&
-  (e as { code?: unknown }).code === 11000;
+  ((e as { code?: unknown }).code === 11000 ||
+    ((e as { code?: unknown }).code === 'ERR_SQLITE_ERROR' &&
+      typeof (e as { message?: unknown }).message === 'string' &&
+      (e as { message: string }).message.startsWith(
+        'UNIQUE constraint failed:',
+      )));

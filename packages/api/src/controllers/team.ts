@@ -6,12 +6,10 @@ import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
 import * as config from '@/config';
-import { withTransaction } from '@/db';
+import { getDb, withTransaction } from '@/db';
 import * as teams from '@/db/repos/teams';
 import type { ObjectId } from '@/models';
 import Alert from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
 
 export function getTeamInviteUrl(token: string) {
   return `${config.FRONTEND_URL}/join-team?token=${token}`;
@@ -103,26 +101,6 @@ export function updateTeamClickhouseSettings(
   return teams.update(String(teamId), settings as Partial<teams.TeamDoc>);
 }
 
-function getCollectionsWithTags(
-  resourceType?: TagResourceType,
-): Pick<mongoose.Model<unknown>, 'aggregate'>[] {
-  if (resourceType == null) {
-    return [Alert, Dashboard, SavedSearch];
-  }
-
-  switch (resourceType) {
-    case 'alert':
-      return [Alert];
-    case 'dashboard':
-      return [Dashboard];
-    case 'savedSearch':
-      return [SavedSearch];
-    default:
-      resourceType satisfies never;
-      throw new Error(`${resourceType} is not a valid TagResourceType`);
-  }
-}
-
 /**
  * Distinct tags applied to the team's entities. Scoped to one kind of entity
  * when `resourceType` is given.
@@ -131,18 +109,33 @@ export async function getTags(
   teamId: ObjectId,
   resourceType?: TagResourceType,
 ) {
-  const distinctTagsPipeline: mongoose.PipelineStage[] = [
-    // sqlite-port: Mongo aggregation does not cast the SQLite hex team id.
-    { $match: { team: new mongoose.Types.ObjectId(String(teamId)) } },
-    { $unwind: '$tags' },
-    { $group: { _id: '$tags' } },
-  ];
-
-  const tagGroups = await Promise.all(
-    getCollectionsWithTags(resourceType).map(collection =>
-      collection.aggregate<{ _id: string }>(distinctTagsPipeline),
-    ),
-  );
-
-  return [...new Set(tagGroups.flat().map(t => t._id))];
+  const tags = new Set<string>();
+  if (resourceType == null || resourceType === 'dashboard') {
+    // sqlite-port: $unwind/$group over dashboard tags.
+    const rows = getDb()
+      .prepare(
+        `SELECT DISTINCT j.value AS tag FROM dashboards d,
+      json_each(d.tags) j WHERE d.team=?`,
+      )
+      .all(String(teamId)) as { tag: string }[];
+    rows.forEach(row => tags.add(row.tag));
+  }
+  if (resourceType == null || resourceType === 'savedSearch') {
+    const rows = getDb()
+      .prepare(
+        `SELECT DISTINCT j.value AS tag FROM savedsearches s,
+      json_each(s.tags) j WHERE s.team=?`,
+      )
+      .all(String(teamId)) as { tag: string }[];
+    rows.forEach(row => tags.add(row.tag));
+  }
+  if (resourceType == null || resourceType === 'alert') {
+    const rows = await Alert.aggregate<{ _id: string }>([
+      { $match: { team: new mongoose.Types.ObjectId(String(teamId)) } },
+      { $unwind: '$tags' },
+      { $group: { _id: '$tags' } },
+    ]);
+    rows.forEach(row => tags.add(row._id));
+  }
+  return [...tags];
 }

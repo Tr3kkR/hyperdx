@@ -71,19 +71,7 @@ describe('team router', () => {
       })
       .expect(200);
 
-    await agent.post('/sources').send({
-      team: team.id,
-      kind: 'log',
-      name: 'My New Source',
-      connection: new ObjectId().toString(),
-      from: {
-        databaseName: 'system',
-        tableName: 'query_log',
-      },
-      timestampValueExpression: 'event_date',
-      defaultTableSelectExpression: 'event_date,query',
-      id: 'l-1148034466',
-    });
+    const sourceId = new ObjectId().toString();
 
     await agent
       .post('/saved-search')
@@ -92,7 +80,7 @@ describe('team router', () => {
         name: 'Test',
         select: 'SELECT * FROM table',
         where: 'WHERE x = 1',
-        source: 'l-1148034466',
+        source: sourceId,
         tags: ['test', 'test2'],
       })
       .expect(200);

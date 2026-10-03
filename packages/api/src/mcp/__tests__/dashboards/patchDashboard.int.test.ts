@@ -2,7 +2,11 @@ import { MetricsDataType, SourceKind } from '@hyperdx/common-utils/dist/types';
 
 import { DEFAULT_DATABASE, DEFAULT_METRICS_TABLE } from '@/fixtures';
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
-import Dashboard from '@/models/dashboard';
+import {
+  createDashboardFixture,
+  removeDashboardTileFixture,
+} from '@/test/sqliteMetadata';
+import { findDashboardFixture } from '@/test/sqliteMetadata';
 import { createSourceFixture } from '@/test/sqliteMetadata';
 import type { ExternalDashboardTileWithId } from '@/utils/zod';
 
@@ -147,12 +151,12 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
   });
 
   it('should update dashboard name only (no tile patch)', async () => {
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'Original Name',
       tiles: [],
       team: ctx.team._id,
       tags: ['tag1'],
-    }).save();
+    });
 
     const result = await callTool(ctx.client!, 'clickstack_patch_dashboard', {
       dashboardId: dashboard._id.toString(),
@@ -166,17 +170,17 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
     expect(output.patchedTile).toBeUndefined();
 
     // Verify in DB
-    const updated = await Dashboard.findById(dashboard._id);
+    const updated = await findDashboardFixture(dashboard._id);
     expect(updated?.name).toBe('New Name');
   });
 
   it('should update tags only', async () => {
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'Tag Test',
       tiles: [],
       team: ctx.team._id,
       tags: ['old'],
-    }).save();
+    });
 
     const result = await callTool(ctx.client!, 'clickstack_patch_dashboard', {
       dashboardId: dashboard._id.toString(),
@@ -231,11 +235,11 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
   });
 
   it('should return error for non-existent tileId', async () => {
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'Tile Not Found',
       tiles: [],
       team: ctx.team._id,
-    }).save();
+    });
 
     const result = await callTool(ctx.client!, 'clickstack_patch_dashboard', {
       dashboardId: dashboard._id.toString(),
@@ -343,7 +347,7 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
     expect(text).toContain('Filtered SQL');
 
     // The original tile must be untouched in the database.
-    const dashboard = await Dashboard.findById(created.id);
+    const dashboard = await findDashboardFixture(created.id);
     const persistedTile = dashboard?.tiles?.find(
       (t: { id: string }) => t.id === tileId,
     );
@@ -444,7 +448,7 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
     const dashboardId = created.id;
 
     // Snapshot the raw tiles from the DB before patching
-    const beforePatch = await Dashboard.findById(dashboardId).lean();
+    const beforePatch = await findDashboardFixture(dashboardId);
     const tilesBeforePatch = (beforePatch as any).tiles;
     const tileBBefore = tilesBeforePatch[1];
     const tileCBefore = tilesBeforePatch[2];
@@ -469,7 +473,7 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
     expect(patchResult.isError).toBeFalsy();
 
     // Read raw DB tiles again; tiles B and C should be byte-identical
-    const afterPatch = await Dashboard.findById(dashboardId).lean();
+    const afterPatch = await findDashboardFixture(dashboardId);
     const tilesAfterPatch = (afterPatch as any).tiles;
 
     expect(tilesAfterPatch).toHaveLength(3);
@@ -566,9 +570,7 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
 
     // Simulate a concurrent save_dashboard that removes tile A by
     // directly updating the DB to drop it from the array.
-    await Dashboard.findByIdAndUpdate(created.id, {
-      $pull: { tiles: { id: tileAId } },
-    });
+    removeDashboardTileFixture(created.id, tileAId);
 
     // Now try to patch tile A; it no longer exists in the array.
     const patchResult = await callTool(
@@ -871,7 +873,7 @@ describe('MCP Dashboard Tools - clickstack_patch_dashboard', () => {
       expect(patchResult.isError).toBeFalsy();
       const output = JSON.parse(getFirstText(patchResult));
       expect(output.patchedTile.name).toBe('Static SQL');
-      const dashboard = await Dashboard.findById(created.id);
+      const dashboard = await findDashboardFixture(created.id);
       const persistedConfig = dashboard?.tiles?.[0]?.config as {
         sqlTemplate?: string;
       };

@@ -23,8 +23,7 @@ import {
   getAlertChannels,
   IAlert,
 } from '@/models/alert';
-import type { DashboardDocument, IDashboard } from '@/models/dashboard';
-import type { ISavedSearch } from '@/models/savedSearch';
+import type { DashboardDocument } from '@/models/dashboard';
 import { SeriesTile } from '@/routers/external-api/v2/utils/dashboards';
 import {
   isPopulatedRef,
@@ -330,22 +329,28 @@ export type ExternalAlert = {
 // An alert's savedSearch/dashboard ref as this module receives it: a bare
 // ObjectId, or — when the caller used a populating reader — the referenced
 // document, possibly projected down to the display fields.
-type AlertRef<T> = ObjectId | (Partial<T> & { _id: ObjectId }) | null;
+type AlertRef =
+  | ObjectId
+  | {
+      _id: ObjectId | string;
+      name?: string | null;
+      tags?: string[];
+      tiles?: { id: string; config?: { name?: string } }[];
+    }
+  | null;
 
 type AlertRefFields = {
-  savedSearch?: AlertRef<ISavedSearch>;
-  dashboard?: AlertRef<IDashboard>;
+  savedSearch?: AlertRef;
+  dashboard?: AlertRef;
 };
 
 type AlertDocumentObject = Omit<IAlert, keyof AlertRefFields> & {
   _id: ObjectId;
 } & AlertRefFields;
 
-export type TranslatableAlertDocument = Omit<
-  AlertDocument,
-  keyof AlertRefFields
-> &
-  AlertRefFields;
+export type TranslatableAlertDocument =
+  | AlertDocumentObject
+  | (Omit<AlertDocument, keyof AlertRefFields> & AlertRefFields);
 
 /**
  * A populated ref whose target was deleted resolves to `null` in `toJSON()`,
@@ -354,7 +359,7 @@ export type TranslatableAlertDocument = Omit<
  * of silently dropping the field.
  */
 function refIdToString(
-  ref: AlertRef<object> | undefined,
+  ref: AlertRef | undefined,
   populatedId: ObjectId | undefined,
 ): string | undefined {
   if (ref == null) {
@@ -372,7 +377,9 @@ function populatedRefId(
   path: keyof AlertRefFields,
 ): ObjectId | undefined {
   const id: unknown =
-    typeof alert.populated === 'function' ? alert.populated(path) : undefined;
+    'populated' in alert && typeof alert.populated === 'function'
+      ? alert.populated(path)
+      : undefined;
   return id instanceof Types.ObjectId ? id : undefined;
 }
 
@@ -444,9 +451,10 @@ export function translateAlertDocumentToExternalAlert(
   // picks the toJSON overload that doesn't wrap every field in FlattenMaps<>
   // (which breaks ObjectId); the alert schema has no Map fields, so the
   // runtime output is identical.
-  const alertObj: AlertDocumentObject = alert.toJSON
-    ? alert.toJSON({ flattenMaps: false })
-    : { ...alert };
+  const alertObj: AlertDocumentObject =
+    'toJSON' in alert && alert.toJSON
+      ? alert.toJSON({ flattenMaps: false })
+      : { ...alert };
 
   const channels = getAlertChannels(alertObj);
 

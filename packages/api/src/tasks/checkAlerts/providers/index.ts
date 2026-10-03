@@ -6,12 +6,15 @@ import {
 } from '@hyperdx/common-utils/dist/types';
 import _ from 'lodash';
 
+import type { SavedSearchDoc } from '@/db/repos/savedSearches';
 import { ObjectId } from '@/models';
 import { IAlert, IAlertError } from '@/models/alert';
 import { IAlertHistory, IAlertHistoryAnalytics } from '@/models/alertHistory';
 import { IDashboard } from '@/models/dashboard';
 import { ISavedSearch } from '@/models/savedSearch';
-import { IWebhook } from '@/models/webhook';
+
+export type SavedSearchLike = Omit<ISavedSearch, 'source'> | SavedSearchDoc;
+import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import { AggregatedAlertHistory } from '@/tasks/checkAlerts';
 import DefaultAlertProvider from '@/tasks/checkAlerts/providers/default';
 import logger from '@/utils/logger';
@@ -52,7 +55,7 @@ export type AlertDetails = {
   | {
       taskType: AlertTaskType.SAVED_SEARCH;
       source: AlertSourceDoc;
-      savedSearch: Omit<ISavedSearch, 'source'>;
+      savedSearch: SavedSearchLike;
     }
   | {
       taskType: AlertTaskType.TILE;
@@ -87,7 +90,7 @@ export interface AlertProvider {
 
   buildLogSearchLink(params: {
     endTime: Date;
-    savedSearch: ISavedSearch;
+    savedSearch: SavedSearchLike;
     startTime: Date;
   }): string;
 

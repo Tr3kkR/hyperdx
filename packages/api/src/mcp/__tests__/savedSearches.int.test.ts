@@ -9,7 +9,10 @@ import {
   getServer,
 } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
-import { SavedSearch } from '@/models/savedSearch';
+import {
+  createSavedSearchFixture,
+  findSavedSearchFixture,
+} from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
   createSourceFixture,
@@ -75,7 +78,7 @@ describe('MCP Saved Search Tools', () => {
   async function createTestSavedSearch(
     overrides: Record<string, unknown> = {},
   ) {
-    return SavedSearch.create({
+    return createSavedSearchFixture({
       team: team._id,
       name: 'Test Saved Search',
       source: traceSource._id,
@@ -224,7 +227,7 @@ describe('MCP Saved Search Tools', () => {
         expect(output.tags).toEqual(['errors']);
 
         // Verify in database
-        const savedSearch = await SavedSearch.findById(output.id);
+        const savedSearch = await findSavedSearchFixture(output.id);
         expect(savedSearch).not.toBeNull();
         expect(savedSearch?.name).toBe('Error Traces');
       });
@@ -375,7 +378,7 @@ describe('MCP Saved Search Tools', () => {
         expect(output.tags).toEqual(['updated']);
 
         // Verify in database
-        const updated = await SavedSearch.findById(savedSearch._id);
+        const updated = await findSavedSearchFixture(savedSearch._id);
         expect(updated?.name).toBe('Updated Name');
         expect(updated?.where).toBe('StatusCode:Ok');
       });

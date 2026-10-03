@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 import * as config from '@/config';
 import { getSavedSearch } from '@/controllers/savedSearch';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpUserError, validateObjectId } from '@/mcp/utils/errors';
-import { SavedSearch } from '@/models/savedSearch';
 
 export function registerGetSavedSearch({
   context,
@@ -35,10 +35,7 @@ export function registerGetSavedSearch({
     async ({ id }) => {
       // ── List all saved searches (slim query — only fetch the fields we need) ──
       if (!id) {
-        const savedSearches = await SavedSearch.find(
-          { team: teamId },
-          'name tags',
-        ).lean();
+        const savedSearches = savedSearchesRepo.list(teamId);
         const output = savedSearches.map(ss => ({
           id: ss._id.toString(),
           name: ss.name,
@@ -67,7 +64,7 @@ export function registerGetSavedSearch({
             type: 'text' as const,
             text: JSON.stringify(
               {
-                ...savedSearch.toExternalJSON(),
+                ...savedSearchesRepo.toExternalJSON(savedSearch),
                 ...(frontendUrl
                   ? { url: `${frontendUrl}/search/${savedSearch._id}` }
                   : {}),

@@ -4,9 +4,17 @@ import request, { SuperAgentTest } from 'supertest';
 
 import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import type { UserDoc as IUser } from '@/db/repos/users';
+import * as webhooksRepo from '@/db/repos/webhooks';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
-import Webhook from '@/models/webhook';
+import {
+  countWebhookFixtures,
+  createMalformedWebhookFixture,
+  createWebhookFixture,
+  deleteWebhookFixture,
+  findWebhookFixture,
+  setWebhookUrlFixture,
+} from '@/test/sqliteMetadata';
 
 const WEBHOOKS_BASE_URL = '/api/v2/webhooks';
 
@@ -78,7 +86,7 @@ describe('External API v2 Webhooks', () => {
 
     it('should paginate with limit and offset and report the total', async () => {
       for (let i = 0; i < 3; i++) {
-        await Webhook.create({
+        await createWebhookFixture({
           name: `Webhook ${i}`,
           service: WebhookService.Slack,
           team: team._id,
@@ -105,7 +113,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should return an empty page with the correct total past the end', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         name: 'Only Webhook',
         service: WebhookService.Slack,
         team: team._id,
@@ -132,7 +140,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should list a Slack webhook with only Slack-allowed fields', async () => {
-      await Webhook.create({ ...MOCK_SLACK_WEBHOOK, team: team._id });
+      await createWebhookFixture({ ...MOCK_SLACK_WEBHOOK, team: team._id });
 
       const response = await authRequest('get', WEBHOOKS_BASE_URL).expect(200);
 
@@ -151,7 +159,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should strip headers and body stored on a Slack webhook', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         headers: { 'X-Secret': 'secret' },
         body: '{"text": "hello"}',
@@ -165,7 +173,10 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should list an IncidentIO webhook with only IncidentIO-allowed fields', async () => {
-      await Webhook.create({ ...MOCK_INCIDENT_IO_WEBHOOK, team: team._id });
+      await createWebhookFixture({
+        ...MOCK_INCIDENT_IO_WEBHOOK,
+        team: team._id,
+      });
 
       const response = await authRequest('get', WEBHOOKS_BASE_URL).expect(200);
 
@@ -184,7 +195,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should strip headers and body stored on an IncidentIO webhook', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         ...MOCK_INCIDENT_IO_WEBHOOK,
         headers: { 'X-Secret': 'secret' },
         body: '{"title": "{{title}}"}',
@@ -198,7 +209,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should list a Generic webhook with body but no headers', async () => {
-      await Webhook.create({ ...MOCK_GENERIC_WEBHOOK, team: team._id });
+      await createWebhookFixture({ ...MOCK_GENERIC_WEBHOOK, team: team._id });
 
       const response = await authRequest('get', WEBHOOKS_BASE_URL).expect(200);
 
@@ -217,9 +228,12 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should return multiple webhooks of different service types', async () => {
-      await Webhook.create({ ...MOCK_SLACK_WEBHOOK, team: team._id });
-      await Webhook.create({ ...MOCK_INCIDENT_IO_WEBHOOK, team: team._id });
-      await Webhook.create({ ...MOCK_GENERIC_WEBHOOK, team: team._id });
+      await createWebhookFixture({ ...MOCK_SLACK_WEBHOOK, team: team._id });
+      await createWebhookFixture({
+        ...MOCK_INCIDENT_IO_WEBHOOK,
+        team: team._id,
+      });
+      await createWebhookFixture({ ...MOCK_GENERIC_WEBHOOK, team: team._id });
 
       const response = await authRequest('get', WEBHOOKS_BASE_URL).expect(200);
 
@@ -231,10 +245,10 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should not return webhooks belonging to another team', async () => {
-      await Webhook.create({ ...MOCK_SLACK_WEBHOOK, team: team._id });
+      await createWebhookFixture({ ...MOCK_SLACK_WEBHOOK, team: team._id });
 
       const otherTeamId = new ObjectId();
-      await Webhook.create({
+      await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         name: 'Other Team Webhook',
         team: otherTeamId,
@@ -247,7 +261,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should work with a minimal Slack webhook (no optional fields)', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         name: 'Minimal Slack Webhook',
         service: WebhookService.Slack,
         team: team._id,
@@ -270,7 +284,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should work with a minimal Generic webhook (no optional fields)', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         name: 'Minimal Generic Webhook',
         service: WebhookService.Generic,
         team: team._id,
@@ -293,16 +307,12 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should count a row that fails schema parse in total but omit it from data', async () => {
-      await Webhook.create({ ...MOCK_SLACK_WEBHOOK, team: team._id });
-      // Insert a malformed row directly, bypassing Mongoose validation, so it
+      await createWebhookFixture({ ...MOCK_SLACK_WEBHOOK, team: team._id });
+      // Insert a malformed row directly, bypassing API validation, so it
       // fails externalWebhookSchema parsing on read. meta.total counts every
       // stored row (countDocuments) while data drops the unparseable one, so
       // data.length can be less than meta.total — this documents that skew.
-      await Webhook.collection.insertOne({
-        team: new ObjectId(team._id),
-        name: 'Broken Webhook',
-        service: 'not-a-real-service',
-      } as any);
+      createMalformedWebhookFixture(team._id, 'not-a-real-service');
 
       const response = await authRequest('get', WEBHOOKS_BASE_URL).expect(200);
 
@@ -341,7 +351,7 @@ describe('External API v2 Webhooks', () => {
       expect(response.body.data).not.toHaveProperty('queryParams');
 
       // ...but they should be persisted
-      const stored = await Webhook.findById(response.body.data.id).lean();
+      const stored = await findWebhookFixture(response.body.data.id);
       expect(stored?.headers).toBeDefined();
     });
 
@@ -368,7 +378,7 @@ describe('External API v2 Webhooks', () => {
         .expect(400);
 
       expect(response.body.message).toContain('private or reserved address');
-      expect(await Webhook.countDocuments({})).toBe(0);
+      expect(await countWebhookFixtures()).toBe(0);
     });
 
     it.each(['headers', 'queryParams', 'body'])(
@@ -515,7 +525,7 @@ describe('External API v2 Webhooks', () => {
 
   describe('PUT /api/v2/webhooks/:id', () => {
     it('should reject a private webhook URL without updating it', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         team: team._id,
       });
@@ -528,13 +538,13 @@ describe('External API v2 Webhooks', () => {
         .expect(400);
 
       expect(response.body.message).toContain('private or reserved address');
-      expect((await Webhook.findById(created._id))!.url).toBe(
+      expect((await findWebhookFixture(created._id))!.url).toBe(
         MOCK_GENERIC_WEBHOOK.url,
       );
     });
 
     it('should replace readable fields but preserve omitted write-only fields when the destination is unchanged', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         team: team._id,
       });
@@ -557,7 +567,7 @@ describe('External API v2 Webhooks', () => {
       expect(response.body.data).not.toHaveProperty('headers');
       expect(response.body.data).not.toHaveProperty('queryParams');
 
-      const stored = await Webhook.findById(created._id).lean();
+      const stored = await findWebhookFixture(created._id);
       // headers omitted + destination unchanged => preserved (clients can never read them back)
       expect(stored?.headers).toEqual(MOCK_GENERIC_WEBHOOK.headers);
       // readable fields omitted => cleared (full replace)
@@ -566,7 +576,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should preserve omitted queryParams when the destination is unchanged', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         queryParams: { token: 'secret-token' },
         team: team._id,
@@ -581,7 +591,7 @@ describe('External API v2 Webhooks', () => {
         })
         .expect(200);
 
-      const stored = await Webhook.findById(created._id).lean();
+      const stored = await findWebhookFixture(created._id);
       expect(stored?.queryParams).toEqual({ token: 'secret-token' });
     });
 
@@ -589,7 +599,7 @@ describe('External API v2 Webhooks', () => {
       // The exfiltration path: a caller who cannot read headers/queryParams
       // back must not be able to repoint url at an endpoint they control and
       // have the stored secret headers forwarded there on the next alert.
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         headers: { Authorization: 'Bearer super-secret' },
         queryParams: { token: 'secret-token' },
@@ -605,7 +615,7 @@ describe('External API v2 Webhooks', () => {
         })
         .expect(200);
 
-      const stored = await Webhook.findById(created._id).lean();
+      const stored = await findWebhookFixture(created._id);
       // Stored secrets must be cleared, never forwarded to the new destination.
       expect(stored?.headers).toBeUndefined();
       expect(stored?.queryParams).toBeUndefined();
@@ -613,7 +623,7 @@ describe('External API v2 Webhooks', () => {
     });
 
     it('should clear stored write-only secrets when the service changes', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         headers: { Authorization: 'Bearer super-secret' },
         team: team._id,
@@ -628,12 +638,12 @@ describe('External API v2 Webhooks', () => {
         })
         .expect(200);
 
-      const stored = await Webhook.findById(created._id).lean();
+      const stored = await findWebhookFixture(created._id);
       expect(stored?.headers).toBeUndefined();
     });
 
     it('should keep re-supplied write-only fields when the url changes', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         headers: { Authorization: 'Bearer old-secret' },
         team: team._id,
@@ -648,13 +658,13 @@ describe('External API v2 Webhooks', () => {
         })
         .expect(200);
 
-      const stored = await Webhook.findById(created._id).lean();
+      const stored = await findWebhookFixture(created._id);
       // Explicitly re-supplied for the new destination => written.
       expect(stored?.headers).toEqual({ Authorization: 'Bearer new-secret' });
     });
 
     it('should clear write-only fields when an explicit empty object is sent', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         team: team._id,
       });
@@ -668,16 +678,16 @@ describe('External API v2 Webhooks', () => {
         })
         .expect(200);
 
-      const stored = await Webhook.findById(created._id).lean();
+      const stored = await findWebhookFixture(created._id);
       expect(stored?.headers).toBeUndefined();
     });
 
     it('should reject renaming a webhook onto an existing service + name', async () => {
-      await Webhook.create({
+      await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         team: team._id,
       });
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         name: 'Another Slack Webhook',
         team: team._id,
@@ -694,7 +704,7 @@ describe('External API v2 Webhooks', () => {
 
     it('should return 404 for a webhook belonging to another team', async () => {
       const otherTeamId = new ObjectId();
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         team: otherTeamId,
       });
@@ -717,23 +727,21 @@ describe('External API v2 Webhooks', () => {
       // Simulate that race: the initial findOne returns the stale snapshot but
       // a concurrent write has already moved the url, so the pinned update
       // matches nothing while the document still exists => 409.
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         team: team._id,
       });
-      const staleDoc = await Webhook.findOne({
-        _id: created._id,
-        team: team._id,
-      });
+      const staleDoc = webhooksRepo.findById(created._id, String(team._id));
 
-      const spy = jest.spyOn(Webhook, 'findOne').mockImplementationOnce((() =>
-        (async () => {
-          await Webhook.updateOne(
-            { _id: created._id },
-            { $set: { url: 'https://example.com/moved-concurrently' } },
+      const spy = jest
+        .spyOn(webhooksRepo, 'findById')
+        .mockImplementationOnce(() => {
+          setWebhookUrlFixture(
+            created._id,
+            'https://example.com/moved-concurrently',
           );
           return staleDoc;
-        })()) as any);
+        });
 
       try {
         const response = await authRequest(
@@ -752,7 +760,7 @@ describe('External API v2 Webhooks', () => {
       }
 
       // The losing update did not apply; the concurrent write stands.
-      const stored = await Webhook.findById(created._id).lean();
+      const stored = await findWebhookFixture(created._id);
       expect(stored?.url).toBe('https://example.com/moved-concurrently');
       expect(stored?.name).toBe(MOCK_GENERIC_WEBHOOK.name);
     });
@@ -760,20 +768,18 @@ describe('External API v2 Webhooks', () => {
     it('should return 404 when the webhook is deleted concurrently between read and write', async () => {
       // Same pinned-update miss, but the document no longer exists => the
       // 409-vs-404 disambiguation (Webhook.exists) must resolve to 404.
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_GENERIC_WEBHOOK,
         team: team._id,
       });
-      const staleDoc = await Webhook.findOne({
-        _id: created._id,
-        team: team._id,
-      });
+      const staleDoc = webhooksRepo.findById(created._id, String(team._id));
 
-      const spy = jest.spyOn(Webhook, 'findOne').mockImplementationOnce((() =>
-        (async () => {
-          await Webhook.deleteOne({ _id: created._id });
+      const spy = jest
+        .spyOn(webhooksRepo, 'findById')
+        .mockImplementationOnce(() => {
+          deleteWebhookFixture(created._id);
           return staleDoc;
-        })()) as any);
+        });
 
       try {
         await authRequest('put', `${WEBHOOKS_BASE_URL}/${created._id}`)
@@ -787,13 +793,13 @@ describe('External API v2 Webhooks', () => {
         spy.mockRestore();
       }
 
-      expect(await Webhook.findById(created._id)).toBeNull();
+      expect(await findWebhookFixture(created._id)).toBeNull();
     });
   });
 
   describe('DELETE /api/v2/webhooks/:id', () => {
     it('should delete a webhook', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         team: team._id,
       });
@@ -802,12 +808,12 @@ describe('External API v2 Webhooks', () => {
         200,
       );
 
-      expect(await Webhook.findById(created._id)).toBeNull();
+      expect(await findWebhookFixture(created._id)).toBeNull();
     });
 
     it('should return 404 for a webhook belonging to another team', async () => {
       const otherTeamId = new ObjectId();
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         team: otherTeamId,
       });
@@ -817,11 +823,11 @@ describe('External API v2 Webhooks', () => {
       );
 
       // untouched
-      expect(await Webhook.findById(created._id)).not.toBeNull();
+      expect(await findWebhookFixture(created._id)).not.toBeNull();
     });
 
     it('should return 409 (not orphan alerts) when an alert still references the webhook', async () => {
-      const created = await Webhook.create({
+      const created = await createWebhookFixture({
         ...MOCK_SLACK_WEBHOOK,
         team: team._id,
       });
@@ -842,7 +848,7 @@ describe('External API v2 Webhooks', () => {
       expect(response.body.message).toMatch(/still reference/i);
 
       // The webhook must survive so the referencing alert isn't orphaned.
-      expect(await Webhook.findById(created._id)).not.toBeNull();
+      expect(await findWebhookFixture(created._id)).not.toBeNull();
     });
   });
 });
