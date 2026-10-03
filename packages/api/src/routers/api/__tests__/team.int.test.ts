@@ -6,7 +6,8 @@ import * as teamInvites from '@/db/repos/teamInvites';
 import * as teams from '@/db/repos/teams';
 import * as users from '@/db/repos/users';
 import { getLoggedInAgent, getServer } from '@/fixtures';
-import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
+import { AlertSource, AlertThresholdType } from '@/models/alert';
+import { createAlertFixture, findAlertFixture } from '@/test/sqliteMetadata';
 
 describe('team router', () => {
   const server = getServer();
@@ -85,7 +86,7 @@ describe('team router', () => {
       })
       .expect(200);
 
-    await Alert.create({
+    await createAlertFixture({
       team: team.id,
       source: AlertSource.SAVED_SEARCH,
       savedSearch: new mongoose.Types.ObjectId(),
@@ -99,7 +100,7 @@ describe('team router', () => {
       tags: ['test2', 'test3'],
     });
 
-    await Alert.create({
+    await createAlertFixture({
       team: new mongoose.Types.ObjectId(),
       source: AlertSource.SAVED_SEARCH,
       savedSearch: new mongoose.Types.ObjectId(),
@@ -320,7 +321,7 @@ describe('team router', () => {
       team: team.id,
     });
 
-    const alert = await Alert.create({
+    const alert = await createAlertFixture({
       createdBy: user1._id,
       team: team.id,
       source: AlertSource.SAVED_SEARCH,
@@ -334,7 +335,7 @@ describe('team router', () => {
       },
     });
 
-    const alertInAnotherTeam = await Alert.create({
+    const alertInAnotherTeam = await createAlertFixture({
       createdBy: user1._id,
       team: new mongoose.Types.ObjectId(), // Different team ID
       source: AlertSource.SAVED_SEARCH,
@@ -350,12 +351,12 @@ describe('team router', () => {
 
     await agent.delete(`/team/member/${user1._id}`).expect(200);
 
-    const alertAfterUserDeletion = await Alert.findById(alert._id);
+    const alertAfterUserDeletion = await findAlertFixture(alert._id);
     expect(alertAfterUserDeletion).not.toBeNull();
     expect(alertAfterUserDeletion?.createdBy?.toString()).toEqual(user._id);
 
     // Ensure alert in another team is not modified
-    const alertInAnotherTeamAfterDeletion = await Alert.findById(
+    const alertInAnotherTeamAfterDeletion = await findAlertFixture(
       alertInAnotherTeam._id,
     );
     expect(alertInAnotherTeamAfterDeletion).not.toBeNull();

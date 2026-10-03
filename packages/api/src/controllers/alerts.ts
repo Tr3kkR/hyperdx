@@ -7,10 +7,11 @@ import {
 import { isRawSqlSavedChartConfig } from '@hyperdx/common-utils/dist/guards';
 import { isRangeThresholdType } from '@hyperdx/common-utils/dist/types';
 import { groupBy } from 'lodash';
-import { Types } from 'mongoose';
 import { z } from 'zod';
 
 import { recordOnboardingTaskCompletion } from '@/controllers/user';
+import { normalizeId } from '@/db/ids';
+import * as alertsRepo from '@/db/repos/alerts';
 import * as connectionsRepo from '@/db/repos/connections';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as savedSearchesRepo from '@/db/repos/savedSearches';
@@ -19,9 +20,8 @@ import type { UserDoc as IUser } from '@/db/repos/users';
 import { hydrateUsers } from '@/db/repos/users';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import type { ObjectId } from '@/models';
-import Alert, {
+import {
   AlertChannel,
-  type AlertDocument,
   AlertSource,
   getAlertChannels,
   IAlert,
@@ -170,14 +170,11 @@ export const validateAlertInput = async (
         // wrong database — silently wrong values when the table also exists
         // there, repeated query failures when it does not.
         //
-        // Compare as ObjectIds, not strings: objectIdSchema admits every
-        // representation ObjectId.isValid does (uppercase hex, 12-byte
-        // strings), and the Mongo lookups above cast them — a lexical
-        // comparison would reject an equivalent non-canonical ID.
+        // sqlite-port: ObjectId.equals on Mongo refs becomes normalized hex
+        // comparison, so uppercase IDs remain equivalent.
         if (
-          !new Types.ObjectId(String(source.connection)).equals(
-            chartConfig.connection,
-          )
+          normalizeId(String(source.connection)) !==
+          normalizeId(chartConfig.connection)
         ) {
           throw new Api400Error(
             'Source does not belong to the specified connection',
@@ -345,10 +342,10 @@ export const createAlert = async (
   userId: ObjectId,
   refs: AlertRefs = {},
 ) => {
-  const alert = await new Alert({
-    ...makeAlert(alertInput, userId, refs),
-    team: teamId,
-  }).save();
+  const alert = alertsRepo.create(
+    teamId,
+    makeAlert(alertInput, userId, refs) as alertsRepo.AlertFields,
+  );
   recordOnboardingTaskCompletion(userId, 'alert');
   return alert;
 };
@@ -362,15 +359,10 @@ export const updateAlert = async (
   userId?: ObjectId,
 ) => {
   // should consider clearing AlertHistory when updating an alert?
-  const alert = await Alert.findOneAndUpdate(
-    {
-      _id: id,
-      team: teamId,
-    },
-    makeAlertUpdate(alertInput, undefined, refs),
-    {
-      returnDocument: 'after',
-    },
+  const alert = alertsRepo.update(
+    id,
+    teamId,
+    makeAlertUpdate(alertInput, undefined, refs).$set as alertsRepo.AlertFields,
   );
   // Editing an alert also completes "set up an alert", not just creating one.
   if (alert != null) {
@@ -380,26 +372,22 @@ export const updateAlert = async (
 };
 
 export const countAlerts = async (teamId: ObjectId) => {
-  return Alert.countDocuments({ team: teamId });
+  return alertsRepo.count(teamId);
 };
 
 export const getAlertById = async (
   alertId: ObjectId | string,
   teamId: ObjectId | string,
 ) => {
-  return Alert.findOne({
-    _id: alertId,
-    team: teamId,
-  });
+  return alertsRepo.findById(alertId, teamId);
 };
 
 export const getTeamDashboardAlertsByDashboardAndTile = async (
   teamId: ObjectId,
 ) => {
-  const alerts = await Alert.find({
-    source: AlertSource.TILE,
-    team: teamId,
-  });
+  const alerts = alertsRepo
+    .list(teamId)
+    .filter(a => a.source === AlertSource.TILE);
   return groupBy(alerts, a => `${a.dashboard?.toString()}:${a.tileId}`);
 };
 
@@ -407,11 +395,11 @@ export const getDashboardAlertsByTile = async (
   teamId: ObjectId,
   dashboardId: ObjectId | string,
 ) => {
-  const alerts = await Alert.find({
-    dashboard: dashboardId,
-    source: AlertSource.TILE,
-    team: teamId,
-  });
+  const alerts = alertsRepo
+    .list(teamId)
+    .filter(
+      a => a.source === AlertSource.TILE && a.dashboard === String(dashboardId),
+    );
   return groupBy(alerts, 'tileId');
 };
 
@@ -424,28 +412,24 @@ export const createOrUpdateDashboardAlerts = async (
   const dashboardId = dashboard._id;
   const result = await Promise.all(
     Object.entries(alertsByTile).map(async ([tileId, alert]) => {
-      const filter = {
-        dashboard: dashboardId,
-        tileId,
-        source: AlertSource.TILE,
-        team: teamId,
-      };
       const alertInput = {
         ...alert,
         source: AlertSource.TILE,
         dashboardId: dashboardId.toString(),
         tileId,
       };
-      const oldAlert = await Alert.findOne(filter);
+      const oldAlert = alertsRepo.findTileAlert(teamId, dashboardId, tileId);
       const alertUpdate =
         oldAlert && oldAlert.createdBy
           ? makeAlertUpdate(alertInput, undefined, { dashboard })
           : makeAlertUpdate(alertInput, userId, { dashboard });
 
-      return await Alert.findOneAndUpdate(filter, alertUpdate, {
-        new: true,
-        upsert: true,
-      });
+      return alertsRepo.upsertTileAlert(
+        teamId,
+        dashboardId,
+        tileId,
+        alertUpdate.$set as alertsRepo.AlertFields,
+      );
     }),
   );
 
@@ -462,26 +446,22 @@ export const deleteDashboardAlerts = async (
   teamId: ObjectId,
   tileIds?: string[],
 ) => {
-  return Alert.deleteMany({
-    dashboard: dashboardId,
-    team: teamId,
-    source: AlertSource.TILE,
-    ...(tileIds && { tileId: { $in: tileIds } }),
-  });
+  return {
+    deletedCount: alertsRepo.removeByDashboard(dashboardId, teamId, tileIds),
+  };
 };
 
 export const deleteSavedSearchAlerts = async (
   savedSearchId: string,
   teamId: string,
 ) => {
-  return Alert.deleteMany({
-    savedSearch: savedSearchId,
-    team: teamId,
-  });
+  return {
+    deletedCount: alertsRepo.removeBySavedSearch(savedSearchId, teamId),
+  };
 };
 
-export function withDisplayRefs(alert: AlertDocument) {
-  const plain = alert.toObject({ virtuals: true });
+export function withDisplayRefs(alert: alertsRepo.AlertDoc) {
+  const plain = alert;
   const team = String(alert.team);
   const savedSearch =
     alert.savedSearch == null
@@ -495,7 +475,7 @@ export function withDisplayRefs(alert: AlertDocument) {
       : (dashboardsRepo.findById(String(alert.dashboard), team) ??
         alert.dashboard);
   // sqlite-port: Mongoose populate for SavedSearch and Dashboard is an explicit
-  // lookup of the SQLite parent rows while Alert still lives in Mongo.
+  // lookup of the SQLite parent rows.
   return { ...plain, savedSearch, dashboard };
 }
 
@@ -504,10 +484,7 @@ export const getAlertsWithDisplayRefs = async (
   teamId: ObjectId,
   { limit, offset }: { limit: number; offset: number },
 ) => {
-  const alerts = await Alert.find({ team: teamId })
-    .sort({ _id: 1 })
-    .skip(offset)
-    .limit(limit);
+  const alerts = alertsRepo.list(teamId).slice(offset, offset + limit);
   return alerts.map(withDisplayRefs);
 };
 
@@ -516,10 +493,7 @@ export const getAlertWithDisplayRefs = async (
   alertId: ObjectId | string,
   teamId: ObjectId | string,
 ) => {
-  const alert = await Alert.findOne({
-    _id: alertId,
-    team: teamId,
-  });
+  const alert = alertsRepo.findById(alertId, teamId);
   return alert ? withDisplayRefs(alert) : null;
 };
 
@@ -546,10 +520,7 @@ export const getAlertEnhanced = async (
   alertId: ObjectId | string,
   teamId: ObjectId,
 ) => {
-  const alert = await Alert.findOne({
-    _id: alertId,
-    team: teamId,
-  });
+  const alert = alertsRepo.findById(alertId, teamId);
   if (!alert) return null;
   const plain = hydrateUsers(
     [withDisplayRefs(alert)],
@@ -559,8 +530,11 @@ export const getAlertEnhanced = async (
 };
 
 export const deleteAlert = async (id: string, teamId: ObjectId) => {
-  return Alert.deleteOne({
-    _id: id,
-    team: teamId,
-  });
+  return { deletedCount: Number(alertsRepo.remove(id, teamId)) };
 };
+
+export const setAlertSilenced = (
+  id: string,
+  teamId: ObjectId,
+  silenced?: IAlert['silenced'],
+) => alertsRepo.update(id, teamId, { silenced });

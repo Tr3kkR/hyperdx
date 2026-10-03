@@ -1,11 +1,12 @@
 import { Types } from 'mongoose';
 
+import * as alertsRepo from '@/db/repos/alerts';
 import { getLoggedInAgent, getServer } from '@/fixtures';
-import Alert from '@/models/alert';
 import { WebhookService } from '@/models/webhook';
 import * as transports from '@/tasks/checkAlerts/transports';
 import { buildWebhookTemplateVariables } from '@/tasks/checkAlerts/transports/generic';
 import type { Message } from '@/tasks/checkAlerts/transports/types';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 import {
   countWebhookFixtures,
   createWebhookFixture,
@@ -241,7 +242,7 @@ describe('webhooks router', () => {
     });
 
     // 2. Create an alert pointing to that webhook
-    await Alert.create({
+    await createAlertFixture({
       team: team._id,
       name: 'Test Alert',
       channel: {
@@ -272,7 +273,7 @@ describe('webhooks router', () => {
       team: team._id,
     });
 
-    await Alert.create({
+    await createAlertFixture({
       team: team._id,
       name: 'Multi-channel Alert',
       channel: { type: 'email' },
@@ -300,7 +301,7 @@ describe('webhooks router', () => {
       team: team._id,
     });
 
-    const alert = await Alert.create({
+    const alert = await createAlertFixture({
       team: team._id,
       name: 'Test Alert',
       channel: {
@@ -318,7 +319,7 @@ describe('webhooks router', () => {
     await agent.delete(`/webhooks/${webhook._id}`).expect(409);
 
     // Remove the alert
-    await Alert.findByIdAndDelete(alert._id);
+    alertsRepo.remove(alert._id, team._id);
 
     // Now deletion should succeed
     await agent.delete(`/webhooks/${webhook._id}`).expect(200);

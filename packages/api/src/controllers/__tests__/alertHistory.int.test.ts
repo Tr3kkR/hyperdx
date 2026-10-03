@@ -8,10 +8,10 @@ import {
   getRecentAlertHistories,
   getRecentAlertHistoriesBatch,
 } from '@/controllers/alertHistory';
+import * as AlertHistory from '@/db/repos/alertHistories';
 import * as Team from '@/db/repos/teams';
 import { clearDBCollections, closeDB, connectDB } from '@/fixtures';
 import Alert, { AlertState } from '@/models/alert';
-import AlertHistory from '@/models/alertHistory';
 
 describe('alertHistory controller', () => {
   beforeAll(async () => {
@@ -866,7 +866,7 @@ describe('alertHistory controller', () => {
         lastValues: [{ startTime: bucket, count: i }],
         group: `ServiceName:svc-${String(i).padStart(3, '0')}`,
       }));
-      await AlertHistory.insertMany(rows);
+      await AlertHistory.createMany(rows);
 
       const page = await getAlertEvaluations({
         alertId: new ObjectId(alert._id),

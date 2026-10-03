@@ -19,8 +19,9 @@ import {
   makeExternalChart,
   makeExternalTile,
 } from '@/fixtures';
-import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
+import { AlertSource, AlertThresholdType } from '@/models/alert';
 import { WebhookService } from '@/models/webhook';
+import { createAlertFixture, findAlertFixture } from '@/test/sqliteMetadata';
 import {
   countAllDashboardFixtures,
   setDashboardTileFixture,
@@ -5101,7 +5102,7 @@ describe('External API v2 Dashboards - new format', () => {
       });
 
       // Create a standalone alert for the builder tile
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         dashboard: dashboard._id,
         tileId,
@@ -5112,7 +5113,7 @@ describe('External API v2 Dashboards - new format', () => {
         channel: { type: 'webhook', webhookId: webhook._id.toString() },
       });
 
-      expect(await Alert.findById(alert._id)).not.toBeNull();
+      expect(await findAlertFixture(alert._id)).not.toBeNull();
 
       // Update the tile to raw SQL config (same tile ID)
       await authRequest('put', `${BASE_URL}/${dashboard._id}`)
@@ -5138,7 +5139,7 @@ describe('External API v2 Dashboards - new format', () => {
         })
         .expect(200);
 
-      expect(await Alert.findById(alert._id)).toBeNull();
+      expect(await findAlertFixture(alert._id)).toBeNull();
     });
 
     it('should delete alert when a tile with an alert is removed from the dashboard', async () => {
@@ -5206,7 +5207,7 @@ describe('External API v2 Dashboards - new format', () => {
         team: team._id,
       });
 
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         dashboard: dashboard._id,
         tileId: removeTileId,
@@ -5217,7 +5218,7 @@ describe('External API v2 Dashboards - new format', () => {
         channel: { type: 'webhook', webhookId: webhook._id.toString() },
       });
 
-      expect(await Alert.findById(alert._id)).not.toBeNull();
+      expect(await findAlertFixture(alert._id)).not.toBeNull();
 
       // Update the dashboard, omitting the tile that had an alert
       await authRequest('put', `${BASE_URL}/${dashboard._id}`)
@@ -5242,7 +5243,7 @@ describe('External API v2 Dashboards - new format', () => {
         })
         .expect(200);
 
-      expect(await Alert.findById(alert._id)).toBeNull();
+      expect(await findAlertFixture(alert._id)).toBeNull();
     });
 
     it('does not re-validate heatmap source-kind for unchanged heatmap tiles', async () => {

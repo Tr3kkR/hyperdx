@@ -11,9 +11,10 @@ import {
   RAW_SQL_NUMBER_ALERT_TEMPLATE,
 } from '@/fixtures';
 import { AlertSource, AlertThresholdType } from '@/models/alert';
-import Alert from '@/models/alert';
 import Dashboard from '@/models/dashboard';
+import { createAlertFixture, findAlertFixture } from '@/test/sqliteMetadata';
 import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { setAlertExecutionErrorsFixture } from '@/test/sqliteMetadata';
 import {
   createSavedSearchFixture,
   deleteSavedSearchFixture,
@@ -171,7 +172,7 @@ describe('External API Alerts', () => {
 
   // Helper to create a test alert directly in the database (bypasses validation)
   const createTestAlertDirectly = async (overrides = {}) => {
-    return Alert.create({
+    return createAlertFixture({
       team: team._id,
       dashboardId: new ObjectId().toString(),
       tileId: new ObjectId().toString(),
@@ -1020,7 +1021,7 @@ describe('External API Alerts', () => {
       });
 
       // Mongo persists the internal dialect the check-alerts task evaluates.
-      const stored = await Alert.findById(created.body.data.id);
+      const stored = await findAlertFixture(created.body.data.id);
       expect(stored!.chartConfig).toMatchObject({
         displayType: 'line',
         source: source._id.toString(),
@@ -1203,7 +1204,7 @@ describe('External API Alerts', () => {
         asRatio: true,
       });
 
-      const stored = await Alert.findById(created.body.data.id);
+      const stored = await findAlertFixture(created.body.data.id);
       expect(stored!.threshold).toBe(42);
       expect(stored!.chartConfig).toMatchObject({
         groupBy: 'ServiceName',
@@ -1238,7 +1239,7 @@ describe('External API Alerts', () => {
         })
         .expect(200);
 
-      let stored = await Alert.findById(created.body.data.id);
+      let stored = await findAlertFixture(created.body.data.id);
       expect(stored!.chartConfig).toBeNull();
       expect(stored!.dashboard?.toString()).toBe(dashboard._id.toString());
       expect(stored!.tileId).toBe(tileId);
@@ -1252,7 +1253,7 @@ describe('External API Alerts', () => {
         )
         .expect(200);
 
-      stored = await Alert.findById(created.body.data.id);
+      stored = await findAlertFixture(created.body.data.id);
       expect(stored!.chartConfig).toMatchObject({
         source: source._id.toString(),
       });
@@ -1465,7 +1466,7 @@ describe('External API Alerts', () => {
       });
 
       // Stored internally with the internal field names
-      const stored = await Alert.findById(created.body.data.id);
+      const stored = await findAlertFixture(created.body.data.id);
       expect(stored!.chartConfig).toMatchObject({
         configType: 'sql',
         connection: connection._id.toString(),
@@ -1656,7 +1657,7 @@ describe('External API Alerts', () => {
           ),
         )
         .expect(200);
-      const storedBefore = await Alert.findById(created.body.data.id);
+      const storedBefore = await findAlertFixture(created.body.data.id);
 
       const single = await authRequest(
         'get',
@@ -1673,7 +1674,7 @@ describe('External API Alerts', () => {
         single.body.data.chartConfig,
       );
 
-      const storedAfter = await Alert.findById(created.body.data.id);
+      const storedAfter = await findAlertFixture(created.body.data.id);
       expect(storedAfter!.chartConfig).toEqual(storedBefore!.chartConfig);
     });
 
@@ -1694,7 +1695,7 @@ describe('External API Alerts', () => {
         .expect(200);
 
       expect(created.body.data.chartConfig).not.toHaveProperty('unknownField');
-      const stored = await Alert.findById(created.body.data.id);
+      const stored = await findAlertFixture(created.body.data.id);
       expect(stored!.chartConfig).not.toHaveProperty('unknownField');
     });
 
@@ -1776,7 +1777,7 @@ describe('External API Alerts', () => {
       });
 
       // Persisted on the internal shape the evaluator reads.
-      const stored = await Alert.findById(created.body.data.id);
+      const stored = await findAlertFixture(created.body.data.id);
       expect(stored!.chartConfig).toMatchObject({
         name: 'Error Rate Query',
         where: 'ServiceName:api',
@@ -1798,7 +1799,7 @@ describe('External API Alerts', () => {
       await authRequest('put', `${ALERTS_BASE_URL}/${created.body.data.id}`)
         .send(single.body.data)
         .expect(200);
-      const storedAfter = await Alert.findById(created.body.data.id);
+      const storedAfter = await findAlertFixture(created.body.data.id);
       expect(storedAfter!.chartConfig).toEqual(stored!.chartConfig);
     });
 
@@ -1866,7 +1867,7 @@ describe('External API Alerts', () => {
         .expect(400);
 
       // The stored config is untouched by the failed write.
-      const stored = await Alert.findById(alert._id);
+      const stored = await findAlertFixture(alert._id);
       expect(stored!.chartConfig).toMatchObject({
         filters: [{ type: 'sql', condition: "ServiceName = 'api'" }],
       });
@@ -1938,7 +1939,7 @@ describe('External API Alerts', () => {
           .send(single.body.data)
           .expect(400);
 
-        const stored = await Alert.findById(alert._id);
+        const stored = await findAlertFixture(alert._id);
         expect(stored!.chartConfig).toEqual(chartConfig);
       }
     });
@@ -2567,20 +2568,13 @@ describe('External API Alerts', () => {
       const { alert } = await createTestAlert();
 
       const errorTimestamp = new Date('2026-04-17T12:00:00.000Z');
-      await Alert.updateOne(
-        { _id: alert.id },
+      setAlertExecutionErrorsFixture(alert.id, [
         {
-          $set: {
-            executionErrors: [
-              {
-                timestamp: errorTimestamp,
-                type: AlertErrorType.QUERY_ERROR,
-                message: 'ClickHouse returned 500',
-              },
-            ],
-          },
+          timestamp: errorTimestamp,
+          type: AlertErrorType.QUERY_ERROR,
+          message: 'ClickHouse returned 500',
         },
-      );
+      ]);
 
       const res = await authRequest(
         'get',
@@ -2601,20 +2595,13 @@ describe('External API Alerts', () => {
     it('returns recorded execution errors on the list endpoint', async () => {
       const { alert } = await createTestAlert();
 
-      await Alert.updateOne(
-        { _id: alert.id },
+      setAlertExecutionErrorsFixture(alert.id, [
         {
-          $set: {
-            executionErrors: [
-              {
-                timestamp: new Date('2026-04-17T12:00:00.000Z'),
-                type: AlertErrorType.WEBHOOK_ERROR,
-                message: 'webhook delivery failed',
-              },
-            ],
-          },
+          timestamp: new Date('2026-04-17T12:00:00.000Z'),
+          type: AlertErrorType.WEBHOOK_ERROR,
+          message: 'webhook delivery failed',
         },
-      );
+      ]);
 
       const res = await authRequest('get', ALERTS_BASE_URL).expect(200);
       const match = res.body.data.find((a: any) => a.id === alert.id);

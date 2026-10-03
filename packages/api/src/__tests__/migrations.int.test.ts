@@ -1,9 +1,11 @@
 import mongoose from 'mongoose';
 
 import { createTeam } from '@/controllers/team';
+import { getDb } from '@/db';
 import { clearDBCollections, closeDB, connectDB } from '@/fixtures';
 import { backfillAlertDisplayFields } from '@/migrations';
-import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
+import { AlertSource, AlertThresholdType } from '@/models/alert';
+import { createAlertFixture, findAlertFixture } from '@/test/sqliteMetadata';
 import { createDashboardFixture } from '@/test/sqliteMetadata';
 import {
   createSavedSearchFixture,
@@ -70,7 +72,7 @@ describe('backfillAlertDisplayFields', () => {
       clearedTagsAlert,
       danglingAlert,
       inlineAlert,
-    ] = await Alert.create([
+    ] = await createAlertFixture([
       {
         ...baseAlert,
         team: team._id,
@@ -135,7 +137,7 @@ describe('backfillAlertDisplayFields', () => {
     await backfillAlertDisplayFields();
 
     const byId = async (id: mongoose.Types.ObjectId | string) =>
-      Alert.findById(id).lean();
+      findAlertFixture(id);
 
     expect(await byId(searchAlert._id)).toMatchObject({
       displayName: 'Error spikes',
@@ -180,7 +182,7 @@ describe('backfillAlertDisplayFields', () => {
   it('is idempotent: re-running fills newly missing fields and never touches populated ones', async () => {
     const team = await createTeam({ name: 'Test team' });
     const savedSearch = await makeSavedSearch(team._id, { name: 'First name' });
-    const [alert, otherAlert] = await Alert.create([
+    const [alert, otherAlert] = await createAlertFixture([
       {
         ...baseAlert,
         team: team._id,
@@ -196,21 +198,16 @@ describe('backfillAlertDisplayFields', () => {
     ]);
 
     await backfillAlertDisplayFields();
-    expect((await Alert.findById(alert._id).lean())?.displayName).toBe(
-      'First name',
-    );
+    expect((await findAlertFixture(alert._id))?.displayName).toBe('First name');
 
     setSavedSearchNameFixture(savedSearch._id, 'Second name');
-    await Alert.updateOne(
-      { _id: otherAlert._id },
-      { $unset: { displayName: '' } },
-    );
+    getDb()
+      .prepare('UPDATE alerts SET displayName=NULL WHERE id=?')
+      .run(otherAlert.id);
 
     await backfillAlertDisplayFields();
-    expect((await Alert.findById(alert._id).lean())?.displayName).toBe(
-      'First name',
-    );
-    expect((await Alert.findById(otherAlert._id).lean())?.displayName).toBe(
+    expect((await findAlertFixture(alert._id))?.displayName).toBe('First name');
+    expect((await findAlertFixture(otherAlert._id))?.displayName).toBe(
       'Second name',
     );
   });

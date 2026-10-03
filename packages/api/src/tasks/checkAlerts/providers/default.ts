@@ -1,4 +1,3 @@
-import PQueue from '@esm2cjs/p-queue';
 import { displayTypeSupportsRawSqlAlerts } from '@hyperdx/common-utils/dist/core/utils';
 import { isRawSqlSavedChartConfig } from '@hyperdx/common-utils/dist/guards';
 import {
@@ -6,16 +5,17 @@ import {
   RawSqlSavedChartConfig,
   Tile,
 } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 import ms from 'ms';
 import { URLSearchParams } from 'url';
 
 import { ClickhouseClient } from '@/clickhouse';
 import * as config from '@/config';
-import { ALERT_HISTORY_QUERY_CONCURRENCY } from '@/controllers/alertHistory';
 import { LOCAL_APP_TEAM } from '@/controllers/team';
-import { closeDb, openDb } from '@/db';
+import { closeDb, openDb, withTransaction } from '@/db';
+import { normalizeId } from '@/db/ids';
 import { migrate } from '@/db/migrate';
+import * as historiesRepo from '@/db/repos/alertHistories';
+import * as alertsRepo from '@/db/repos/alerts';
 import * as connectionsRepo from '@/db/repos/connections';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as savedSearchesRepo from '@/db/repos/savedSearches';
@@ -24,17 +24,14 @@ import * as sourcesRepo from '@/db/repos/sources';
 import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import { pruneExpired } from '@/db/retention';
-import { connectDB, mongooseConnection, ObjectId } from '@/models';
-import Alert, {
+import type { ObjectId } from '@/models';
+import {
   AlertSource,
   AlertState,
   type IAlert,
   type IAlertError,
 } from '@/models/alert';
-import AlertHistory, {
-  IAlertHistory,
-  IAlertHistoryAnalytics,
-} from '@/models/alertHistory';
+import { IAlertHistory, IAlertHistoryAnalytics } from '@/models/alertHistory';
 import {
   AggregatedAlertHistory,
   getConsecutiveWindowHistories,
@@ -125,13 +122,11 @@ async function getRawSqlSourceMetadata(
   if (!sourceDoc) {
     return undefined;
   }
-  // Compare as ObjectIds: stored configs may hold non-canonical but valid
-  // representations (e.g. uppercase hex), which a lexical compare would
-  // misjudge as a mismatch.
+  // sqlite-port: ObjectId.equals on Mongo refs becomes normalized hex
+  // comparison, including uppercase representations.
   if (
-    !new mongoose.Types.ObjectId(String(sourceDoc.connection)).equals(
-      chartConfig.connection,
-    )
+    normalizeId(String(sourceDoc.connection)) !==
+    normalizeId(chartConfig.connection)
   ) {
     logger.warn({
       message:
@@ -356,9 +351,7 @@ async function loadAlert(
   }
 
   if (config.IS_LOCAL_APP_MODE) {
-    // The id is the 12 character string `_local_team_', which will become an ObjectId
-    // as the ASCII hex values, so 5f6c6f63616c5f7465616d5f.
-    alert.team = new mongoose.Types.ObjectId(LOCAL_APP_TEAM.id);
+    alert.team = LOCAL_APP_TEAM.id;
   }
 
   let conn: AlertConnection | undefined;
@@ -407,33 +400,21 @@ export default class DefaultAlertProvider implements AlertProvider {
     openDb();
     migrate();
     pruneExpired();
-    // The check-alerts worker only reads from MongoDB and never needs to
-    // ensure indexes exist (the API service owns that). Disabling autoIndex
-    // prevents background createIndexes calls from racing the short-lived
-    // connection close (which sends endSessions), surfaced as
-    // MongoExpiredSessionError on mongodb.createIndexes spans.
-    await Promise.all([connectDB({ autoIndex: false })]);
   }
 
   async asyncDispose() {
-    await Promise.all([mongooseConnection.close()]);
     closeDb();
   }
 
   async getAlertTasks(): Promise<AlertTask[]> {
     const groupedTasks = new Map<string, AlertTask>();
-    const alerts = await Alert.find({});
+    const alerts = alertsRepo.list();
 
     const now = new Date();
     const alertIds = alerts.map(({ id }) => id);
-    // Share a single queue across both history fetches so their combined
-    // in-flight per-alert queries stay within one global cap.
-    const historyQueryQueue = new PQueue({
-      concurrency: ALERT_HISTORY_QUERY_CONCURRENCY,
-    });
     const [previousAlerts, recentHistoryMap] = await Promise.all([
-      getPreviousAlertHistories(alertIds, now, historyQueryQueue),
-      getConsecutiveWindowHistories(alerts, now, historyQueryQueue),
+      getPreviousAlertHistories(alertIds, now),
+      getConsecutiveWindowHistories(alerts, now),
     ]);
 
     for (const alert of alerts) {
@@ -540,87 +521,38 @@ export default class DefaultAlertProvider implements AlertProvider {
     errors: IAlertError[],
     evaluatedDateRange?: [Date, Date],
   ) {
-    // Save history records first (in parallel), then update alert state
-    // Use Promise.allSettled to handle partial failures gracefully
-    const historyResults = await Promise.allSettled(
-      histories.map(history => AlertHistory.create(history)),
-    );
-
-    // Log any failed history saves but continue with alert state update
-    const failedHistories = historyResults.filter(
-      (result): result is PromiseRejectedResult => result.status === 'rejected',
-    );
-    if (failedHistories.length > 0) {
-      logger.error({
-        message: 'Some alert history records failed to save',
-        alertId,
-        failedCount: failedHistories.length,
-        totalCount: histories.length,
-        errors: failedHistories.map(f => f.reason),
-      });
-    }
-
-    // Determine final alert state: use successfully saved histories if any, otherwise fallback to computed state
-    // The alert state is ALERT if ANY history (successful or computed) is in ALERT state, otherwise OK
-    const successfulHistories = historyResults
-      .map((result, index) =>
-        result.status === 'fulfilled' ? histories[index] : null,
-      )
-      .filter((h): h is IAlertHistory => h !== null);
-
-    const historiesToCheck =
-      successfulHistories.length > 0 ? successfulHistories : histories;
-
-    const finalState = historiesToCheck.some(h => h.state === AlertState.ALERT)
+    const finalState = histories.some(h => h.state === AlertState.ALERT)
       ? AlertState.ALERT
-      : historiesToCheck.some(h => h.state === AlertState.PENDING)
+      : histories.some(h => h.state === AlertState.PENDING)
         ? AlertState.PENDING
         : AlertState.OK;
-
-    // Update alert state + errors based on this execution
-    await Alert.updateOne(
-      { _id: new mongoose.Types.ObjectId(alertId) },
-      { $set: { state: finalState, executionErrors: errors } },
-    );
-
-    // All histories in one execution share the same createdAt (the current
-    // evaluation window start) and the same evaluation-level analytics.
     const evaluationWindowStart = histories[0]?.createdAt;
-
-    // Failed earlier ticks may have left ERROR rows for windows this
-    // evaluation just covered (recordAlertErrors upserts one per failed
-    // window, and ERROR rows don't mark a window as evaluated, so those
-    // windows are retried — a same-window retry re-evaluates at the same
-    // createdAt, while later ticks fold them in as backfilled buckets
-    // stamped with the current window start). The query has now succeeded
-    // over the whole evaluated range, so remove the stale ERROR rows for
-    // every window it covered — otherwise a recovered window renders as
-    // ERROR until the TTL expires it (the evaluations view ranks ERROR
-    // above OK/ALERT). The range start is exclusive: an ERROR row at
-    // exactly the previous anchor belongs to an already-evaluated window
-    // (e.g. a webhook failure recorded alongside its normal rows) that is
-    // never retried, so it is a truthful record that must survive.
-    if (evaluationWindowStart != null && successfulHistories.length > 0) {
-      await AlertHistory.deleteMany({
-        alert: new mongoose.Types.ObjectId(alertId),
-        state: AlertState.ERROR,
-        createdAt: evaluatedDateRange
-          ? { $gt: evaluatedDateRange[0], $lte: evaluationWindowStart }
-          : evaluationWindowStart,
+    // sqlite-port: Mongo's partial Promise.allSettled history writes and
+    // separate state update become one atomic evaluation transaction.
+    withTransaction(() => {
+      historiesRepo.createMany(histories);
+      const alert = alertsRepo.findById(alertId);
+      if (!alert) throw new Error(`Alert ${alertId} not found`);
+      alertsRepo.update(alertId, alert.team, {
+        state: finalState,
+        executionErrors: errors,
       });
-    }
-
-    // Notification (e.g. webhook) failures happened during this evaluation:
-    // record them as an ERROR history row alongside the normal rows so the
-    // failure is visible in the alert's evaluation history.
-    if (errors.length > 0 && evaluationWindowStart != null) {
-      await this.upsertErrorHistory(
-        alertId,
-        evaluationWindowStart,
-        errors,
-        histories[0]?.analytics,
-      );
-    }
+      if (evaluationWindowStart != null && histories.length > 0) {
+        historiesRepo.deleteErrors(
+          alertId,
+          evaluationWindowStart,
+          evaluatedDateRange?.[0],
+        );
+        if (errors.length > 0) {
+          historiesRepo.upsertError(
+            alertId,
+            evaluationWindowStart,
+            errors,
+            histories[0]?.analytics,
+          );
+        }
+      }
+    });
   }
 
   async recordAlertErrors(
@@ -629,46 +561,19 @@ export default class DefaultAlertProvider implements AlertProvider {
     evaluationWindowStart?: Date,
     analytics?: IAlertHistoryAnalytics,
   ) {
-    await Alert.updateOne(
-      { _id: new mongoose.Types.ObjectId(alertId) },
-      { $set: { executionErrors: errors } },
-    );
-
-    if (evaluationWindowStart != null) {
-      await this.upsertErrorHistory(
-        alertId,
-        evaluationWindowStart,
-        errors,
-        analytics,
-      );
-    }
-  }
-
-  /**
-   * Upsert the ERROR-state history row for the given evaluation window.
-   * Keyed on {alert, createdAt, state} so retries within the same window
-   * update a single row instead of accumulating one row per tick — a
-   * permanently failing 1d alert produces one error row per day, not one per
-   * minute. Rows expire with the collection's existing TTL index.
-   */
-  private async upsertErrorHistory(
-    alertId: string,
-    evaluationWindowStart: Date,
-    errors: IAlertError[],
-    analytics?: IAlertHistoryAnalytics,
-  ) {
-    await AlertHistory.updateOne(
-      {
-        alert: new mongoose.Types.ObjectId(alertId),
-        createdAt: evaluationWindowStart,
-        state: AlertState.ERROR,
-      },
-      {
-        $set: { errors, ...(analytics != null && { analytics }) },
-        $setOnInsert: { counts: 0, lastValues: [] },
-      },
-      { upsert: true },
-    );
+    withTransaction(() => {
+      const alert = alertsRepo.findById(alertId);
+      if (!alert) throw new Error(`Alert ${alertId} not found`);
+      alertsRepo.update(alertId, alert.team, { executionErrors: errors });
+      if (evaluationWindowStart != null) {
+        historiesRepo.upsertError(
+          alertId,
+          evaluationWindowStart,
+          errors,
+          analytics,
+        );
+      }
+    });
   }
 
   async getWebhooks(teamId: string | ObjectId) {

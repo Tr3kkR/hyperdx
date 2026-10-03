@@ -1,24 +1,21 @@
-import PQueue from '@esm2cjs/p-queue';
 import {
   ALERT_EVALUATION_GROUPS_LIMIT,
   ALERT_INTERVAL_TO_MINUTES,
   AlertInterval,
   AlertTransition,
 } from '@hyperdx/common-utils/dist/types';
-import { ObjectId } from 'mongodb';
 
+import * as historiesRepo from '@/db/repos/alertHistories';
 import { AlertState, IAlertError } from '@/models/alert';
-import AlertHistory, {
-  IAlertHistory,
-  IAlertHistoryAnalytics,
-} from '@/models/alertHistory';
+import { IAlertHistory, IAlertHistoryAnalytics } from '@/models/alertHistory';
+
+type AlertId = { toString(): string };
 
 // Re-exported for API-side consumers/tests; the app imports it from
 // common-utils to explain the cap in the UI.
 export { ALERT_EVALUATION_GROUPS_LIMIT };
 
-// Max parallel per-alert queries to avoid overwhelming the DB connection pool
-export const ALERT_HISTORY_QUERY_CONCURRENCY = 20;
+// Removed with the worker's per-alert Mongo history fan-out below in this phase.
 
 /** Alert evaluation interval in milliseconds. */
 const intervalToMs = (interval: AlertInterval): number =>
@@ -87,49 +84,36 @@ function mapGroupedHistories(
   });
 }
 
+function toGroupedHistory(
+  window: historiesRepo.GroupedWindow,
+): GroupedAlertHistory {
+  return {
+    _id: window.createdAt,
+    states: window.rows.map(row => row.state),
+    counts: window.rows.reduce((sum, row) => sum + row.counts, 0),
+    lastValues: window.rows.map(row => row.lastValues),
+    errors: window.rows.map(row => row.errors ?? []),
+  };
+}
+
 /**
  * Fetch grouped evaluation windows (one entry per createdAt, newest first)
  * for the given alert within the createdAt bounds, capped at `limit` groups.
  */
 async function fetchGroupedWindows(
-  alertId: ObjectId,
+  alertId: AlertId,
   createdAt: Record<string, Date>,
   limit: number,
 ): Promise<Omit<IAlertHistory, 'alert'>[]> {
-  const groupedHistories = await AlertHistory.aggregate<GroupedAlertHistory>([
-    {
-      $match: {
-        alert: new ObjectId(alertId),
-        createdAt,
-      },
-    },
-    { $sort: { createdAt: -1 } },
-    {
-      $group: {
-        _id: '$createdAt',
-        states: {
-          $push: '$state',
-        },
-        counts: {
-          $sum: '$counts',
-        },
-        lastValues: {
-          $push: '$lastValues',
-        },
-        errors: {
-          $push: '$errors',
-        },
-      },
-    },
-    {
-      $sort: {
-        _id: -1,
-      },
-    },
-    {
-      $limit: limit,
-    },
-  ]);
+  const groupedHistories: GroupedAlertHistory[] = historiesRepo
+    .groupedWindows({
+      alert: alertId,
+      from: createdAt.$gte,
+      to: createdAt.$lt ?? createdAt.$lte ?? new Date(),
+      exclusiveTo: createdAt.$lt != null,
+      limit,
+    })
+    .map(toGroupedHistory);
 
   return mapGroupedHistories(groupedHistories);
 }
@@ -144,7 +128,7 @@ export async function getRecentAlertHistories({
   interval,
   limit,
 }: {
-  alertId: ObjectId;
+  alertId: AlertId;
   interval: AlertInterval;
   limit: number;
 }): Promise<Omit<IAlertHistory, 'alert'>[]> {
@@ -306,43 +290,20 @@ function mapStructuredWindow(window: StructuredWindow): AlertEvaluationEntry {
  * grouped alerts can be broken down per group.
  */
 async function fetchStructuredWindows(
-  alertId: ObjectId,
+  alertId: AlertId,
   createdAt: Record<string, Date>,
   limit: number,
 ): Promise<AlertEvaluationEntry[]> {
-  const windows = await AlertHistory.aggregate<StructuredWindow>([
-    {
-      $match: {
-        alert: new ObjectId(alertId),
-        createdAt,
-      },
-    },
-    { $sort: { createdAt: -1 } },
-    {
-      $group: {
-        _id: '$createdAt',
-        rows: {
-          $push: {
-            group: '$group',
-            state: '$state',
-            counts: '$counts',
-            lastValues: '$lastValues',
-            fired: '$fired',
-            errors: '$errors',
-            analytics: '$analytics',
-          },
-        },
-      },
-    },
-    {
-      $sort: {
-        _id: -1,
-      },
-    },
-    {
-      $limit: limit,
-    },
-  ]);
+  // sqlite-port: Mongo $group/$push rows by createdAt.
+  const windows: StructuredWindow[] = historiesRepo
+    .groupedWindows({
+      alert: alertId,
+      from: createdAt.$gte,
+      to: createdAt.$lt ?? createdAt.$lte ?? new Date(),
+      exclusiveTo: createdAt.$lt != null,
+      limit,
+    })
+    .map(window => ({ _id: window.createdAt, rows: window.rows }));
 
   return windows.map(mapStructuredWindow);
 }
@@ -369,7 +330,7 @@ export async function getAlertEvaluations({
   endTime,
   before,
 }: {
-  alertId: ObjectId;
+  alertId: AlertId;
   interval: AlertInterval;
   limit: number;
   startTime: Date;
@@ -423,40 +384,25 @@ export async function getAlertEvaluations({
   return { data, hasMore, nextBefore };
 }
 
-/**
- * Batch-fetch recent alert histories for multiple alerts in parallel.
- *
- * Uses per-alert queries with concurrency control instead of a single
- * $in-based aggregation. This avoids the $in + $sort anti-pattern that
- * breaks index-backed sorting in DocumentDB, while eliminating the N+1
- * query pattern from the caller.
- *
- * Each per-alert query uses the compound index {alert: 1, createdAt: -1}
- * for an efficient single-range index scan.
- */
+/** Batch-fetch recent windows using one SQLite grouped query. */
 export async function getRecentAlertHistoriesBatch(
-  alerts: { alertId: ObjectId; interval: AlertInterval }[],
+  alerts: { alertId: AlertId; interval: AlertInterval }[],
   limit: number,
 ): Promise<Map<string, Omit<IAlertHistory, 'alert'>[]>> {
-  const queue = new PQueue({ concurrency: ALERT_HISTORY_QUERY_CONCURRENCY });
-
-  const entries = await Promise.all(
-    alerts.map(({ alertId, interval }) =>
-      queue.add(async () => {
-        const histories = await getRecentAlertHistories({
-          alertId,
-          interval,
-          limit,
-        });
-        return [alertId.toString(), histories] as const;
-      }),
-    ),
+  const windows = historiesRepo.groupedWindowsBatch(
+    alerts.map(({ alertId, interval }) => ({
+      alert: alertId,
+      from: new Date(Date.now() - (limit + 1) * intervalToMs(interval)),
+    })),
+    limit,
   );
-
   return new Map(
-    entries.filter(
-      (e): e is [string, Omit<IAlertHistory, 'alert'>[]] => e !== undefined,
-    ),
+    alerts.map(({ alertId }) => [
+      alertId.toString(),
+      mapGroupedHistories(
+        (windows.get(alertId.toString()) ?? []).map(toGroupedHistory),
+      ),
+    ]),
   );
 }
 
@@ -478,7 +424,7 @@ export async function getAlertTransitionsInRange({
   startTime,
   endTime,
 }: {
-  alertId: ObjectId;
+  alertId: AlertId;
   interval: AlertInterval;
   startTime: Date;
   endTime: Date;
@@ -490,33 +436,25 @@ export async function getAlertTransitionsInRange({
   // positions the marker where the chart plots that bucket's value. ERROR rows
   // are failed evaluations, not state observations — excluding them prevents a
   // query failure mid-firing from drawing a false recovery annotation.
-  const windows = await AlertHistory.aggregate<{
+  const windows: {
     _id: Date;
     states: string[];
-    // One array of bucket-start dates per row in the window (one row per
-    // group for group-by alerts). Push only the dates via a plain field path
-    // and derive the newest in JS — the file's DocumentDB-safe pattern (see
-    // mapGroupedHistories) avoids expression operators inside accumulators,
-    // and pushing dates instead of whole lastValues rows keeps the buffered
-    // payload small. The router caps the scanned span (MAX_HISTORY_SPAN_MS).
     bucketStarts: Date[][];
-  }>([
-    {
-      $match: {
-        alert: new ObjectId(alertId),
-        createdAt: { $gte: lookbackStart, $lte: endTime },
-        state: { $ne: AlertState.ERROR },
-      },
-    },
-    {
-      $group: {
-        _id: '$createdAt',
-        states: { $push: '$state' },
-        bucketStarts: { $push: '$lastValues.startTime' },
-      },
-    },
-    { $sort: { _id: 1 } },
-  ]);
+  }[] = historiesRepo
+    .groupedWindows({
+      alert: alertId,
+      from: lookbackStart,
+      to: endTime,
+      ascending: true,
+      excludeErrors: true,
+    })
+    .map(window => ({
+      _id: window.createdAt,
+      states: window.rows.map(row => row.state),
+      bucketStarts: window.rows.map(row =>
+        row.lastValues.map(value => value.startTime),
+      ),
+    }));
 
   // Newest bucket start across the window's rows; null when no row carries
   // lastValues. Be defensive about missing arrays/fields in case of engine

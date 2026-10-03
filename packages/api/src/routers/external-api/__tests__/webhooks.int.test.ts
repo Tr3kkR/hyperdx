@@ -6,7 +6,8 @@ import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import type { UserDoc as IUser } from '@/db/repos/users';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import { getLoggedInAgent, getServer } from '@/fixtures';
-import Alert, { AlertSource, AlertState } from '@/models/alert';
+import { AlertSource, AlertState } from '@/models/alert';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 import {
   countWebhookFixtures,
   createMalformedWebhookFixture,
@@ -831,7 +832,7 @@ describe('External API v2 Webhooks', () => {
         ...MOCK_SLACK_WEBHOOK,
         team: team._id,
       });
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: AlertSource.SAVED_SEARCH,
         savedSearch: new ObjectId(),
