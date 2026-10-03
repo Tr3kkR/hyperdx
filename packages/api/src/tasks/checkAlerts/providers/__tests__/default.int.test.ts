@@ -10,13 +10,13 @@ import {
   RAW_SQL_ALERT_TEMPLATE,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
 import {
   AlertProvider,
   AlertTaskType,
   loadProvider,
 } from '@/tasks/checkAlerts/providers';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { createSavedSearchFixture } from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
   createSourceFixture,
@@ -89,7 +89,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create saved search
-      const savedSearch = await SavedSearch.create({
+      const savedSearch = await createSavedSearchFixture({
         team: team._id,
         name: 'Test Search',
         select: 'message',
@@ -163,7 +163,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create dashboard
-      const dashboard = await Dashboard.create({
+      const dashboard = await createDashboardFixture({
         team: team._id,
         name: 'Test Dashboard',
         tiles: [tile],
@@ -285,7 +285,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create saved search and alert
-      const savedSearch = await SavedSearch.create({
+      const savedSearch = await createSavedSearchFixture({
         team: team._id,
         name: 'Test Search',
         select: 'message',
@@ -318,7 +318,7 @@ describe('DefaultAlertProvider', () => {
         sourceId: source._id.toString(),
       });
 
-      const dashboard = await Dashboard.create({
+      const dashboard = await createDashboardFixture({
         team: team._id,
         name: 'Test Dashboard',
         tiles: [tile],
@@ -397,7 +397,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create saved searches and alerts
-      const savedSearch1 = await SavedSearch.create({
+      const savedSearch1 = await createSavedSearchFixture({
         team: team._id,
         name: 'Search 1',
         select: 'message',
@@ -408,7 +408,7 @@ describe('DefaultAlertProvider', () => {
         tags: [],
       });
 
-      const savedSearch2 = await SavedSearch.create({
+      const savedSearch2 = await createSavedSearchFixture({
         team: team._id,
         name: 'Search 2',
         select: 'message',
@@ -489,7 +489,7 @@ describe('DefaultAlertProvider', () => {
     it('should skip alerts with missing tile in dashboard', async () => {
       const team = await createTeam({ name: 'Test Team' });
 
-      const dashboard = await Dashboard.create({
+      const dashboard = await createDashboardFixture({
         team: team._id,
         name: 'Test Dashboard',
         tiles: [makeTile({ id: 'existing-tile' })],
@@ -522,7 +522,7 @@ describe('DefaultAlertProvider', () => {
         sourceId: new mongoose.Types.ObjectId().toString(), // Non-existent source
       });
 
-      const dashboard = await Dashboard.create({
+      const dashboard = await createDashboardFixture({
         team: team._id,
         name: 'Test Dashboard',
         tiles: [tile],
@@ -563,7 +563,7 @@ describe('DefaultAlertProvider', () => {
         connection: new mongoose.Types.ObjectId(), // Non-existent connection
       });
 
-      const savedSearch = await SavedSearch.create({
+      const savedSearch = await createSavedSearchFixture({
         team: team._id,
         name: 'Test Search',
         select: 'message',
@@ -638,7 +638,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create saved search
-      const savedSearch = await SavedSearch.create({
+      const savedSearch = await createSavedSearchFixture({
         team: team._id,
         name: 'Test Search',
         select: 'message',
@@ -706,7 +706,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create dashboard
-      const dashboard = await Dashboard.create({
+      const dashboard = await createDashboardFixture({
         team: team._id,
         name: 'Test Dashboard',
         tiles: [tile],
@@ -896,7 +896,7 @@ describe('DefaultAlertProvider', () => {
           source: source._id.toString(),
         },
       };
-      const dashboard = await Dashboard.create({
+      const dashboard = await createDashboardFixture({
         team: team._id,
         name: 'Test Dashboard',
         tiles: [tile],

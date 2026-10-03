@@ -1,9 +1,7 @@
+import * as webhooksRepo from '@/db/repos/webhooks';
+import { WebhookService } from '@/db/repos/webhooks';
 import type { ObjectId } from '@/models';
 import Alert from '@/models/alert';
-import Webhook, {
-  type WebhookDocument,
-  WebhookService,
-} from '@/models/webhook';
 import { validateWebhookUrl } from '@/utils/validators';
 
 export interface WebhookInput {
@@ -26,8 +24,7 @@ export async function createWebhook(
 ) {
   validateWebhookUrl({ service, url });
 
-  return Webhook.create({
-    team,
+  return webhooksRepo.create(team.toString(), {
     name,
     service,
     url,
@@ -39,7 +36,7 @@ export async function createWebhook(
 }
 
 export type UpdateWebhookResult =
-  | { status: 'ok'; webhook: WebhookDocument }
+  | { status: 'ok'; webhook: webhooksRepo.WebhookDoc }
   | { status: 'not_found' }
   | { status: 'conflict' };
 
@@ -55,7 +52,7 @@ export async function updateWebhook(
   webhookId: string,
   { name, service, url, description, queryParams, headers, body }: WebhookInput,
 ): Promise<UpdateWebhookResult> {
-  const existing = await Webhook.findOne({ _id: webhookId, team });
+  const existing = webhooksRepo.findById(webhookId, team.toString());
   if (existing == null) {
     return { status: 'not_found' };
   }
@@ -65,46 +62,43 @@ export async function updateWebhook(
   const destinationChanged =
     url !== existing.url || service !== existing.service;
 
-  const setFields: Record<string, unknown> = { name, service, url };
-  const unsetFields: Record<string, 1> = {};
-
-  if (description === undefined) unsetFields.description = 1;
-  else setFields.description = description;
-
-  if (body === undefined) unsetFields.body = 1;
-  else setFields.body = body;
-
-  if (headers === undefined) {
-    if (destinationChanged) unsetFields.headers = 1;
-  } else if (Object.keys(headers).length === 0) {
-    unsetFields.headers = 1;
-  } else {
-    setFields.headers = headers;
-  }
-
-  if (queryParams === undefined) {
-    if (destinationChanged) unsetFields.queryParams = 1;
-  } else if (Object.keys(queryParams).length === 0) {
-    unsetFields.queryParams = 1;
-  } else {
-    setFields.queryParams = queryParams;
-  }
-
-  const updateOp: Record<string, unknown> =
-    Object.keys(unsetFields).length > 0
-      ? { $set: setFields, $unset: unsetFields }
-      : { $set: setFields };
+  const nextHeaders =
+    headers === undefined
+      ? destinationChanged
+        ? undefined
+        : existing.headers
+      : Object.keys(headers).length
+        ? headers
+        : undefined;
+  const nextQueryParams =
+    queryParams === undefined
+      ? destinationChanged
+        ? undefined
+        : existing.queryParams
+      : Object.keys(queryParams).length
+        ? queryParams
+        : undefined;
 
   // Pin to the snapshotted url/service so a concurrent destination change
   // yields a conflict rather than attaching a secret to the wrong destination.
-  const webhook = await Webhook.findOneAndUpdate(
-    { _id: webhookId, team, url: existing.url, service: existing.service },
-    updateOp,
-    { new: true },
+  const webhook = webhooksRepo.updateIfDestinationMatches(
+    webhookId,
+    team.toString(),
+    existing.url,
+    existing.service,
+    {
+      name,
+      service,
+      url,
+      description,
+      headers: nextHeaders,
+      queryParams: nextQueryParams,
+      body,
+    },
   );
 
   if (webhook == null) {
-    const stillExists = await Webhook.exists({ _id: webhookId, team });
+    const stillExists = webhooksRepo.findById(webhookId, team.toString());
     return stillExists != null
       ? { status: 'conflict' }
       : { status: 'not_found' };
@@ -114,7 +108,7 @@ export async function updateWebhook(
 }
 
 export type DeleteWebhookResult =
-  | { status: 'ok'; webhook: WebhookDocument }
+  | { status: 'ok'; webhook: webhooksRepo.WebhookDoc }
   | { status: 'not_found' }
   | { status: 'referenced'; alertCount: number };
 
@@ -129,14 +123,17 @@ export async function deleteWebhook(
   // Match on webhookId alone (not channel.type) so a legacy/skewed alert that
   // still references this webhook also blocks deletion.
   const alertCount = await Alert.countDocuments({
-    'channel.webhookId': webhookId,
     team,
+    $or: [
+      { 'channel.webhookId': webhookId },
+      { 'channels.webhookId': webhookId },
+    ],
   });
   if (alertCount > 0) {
     return { status: 'referenced', alertCount };
   }
 
-  const deleted = await Webhook.findOneAndDelete({ _id: webhookId, team });
+  const deleted = webhooksRepo.remove(webhookId, team.toString());
   if (deleted == null) {
     return { status: 'not_found' };
   }

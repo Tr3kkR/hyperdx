@@ -13,15 +13,15 @@ import {
 } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
 import AlertHistory from '@/models/alertHistory';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook from '@/models/webhook';
 import { processAlert } from '@/tasks/checkAlerts';
 import {
   AlertDetails,
   AlertTaskType,
   loadProvider,
 } from '@/tasks/checkAlerts/providers';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { createWebhookFixture } from '@/test/sqliteMetadata';
+import { createSavedSearchFixture } from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
   createSourceFixture,
@@ -123,7 +123,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create saved search
-    const savedSearch = await new SavedSearch({
+    const savedSearch = await createSavedSearchFixture({
       team: team._id,
       name: 'Error Logs Search',
       select: 'Body',
@@ -132,15 +132,15 @@ describe('Single Invocation Alert Test', () => {
       orderBy: 'Timestamp',
       source: source.id,
       tags: ['test'],
-    }).save();
+    });
 
     // Create webhook
-    const webhook = await new Webhook({
+    const webhook = createWebhookFixture({
       team: team._id,
       service: 'slack',
       url: 'https://hooks.slack.com/services/test123',
       name: 'Test Webhook',
-    }).save();
+    });
 
     // Create alert
     const mockUserId = new mongoose.Types.ObjectId();
@@ -181,9 +181,7 @@ describe('Single Invocation Alert Test', () => {
     ]);
 
     // Get the alert with populated references
-    const enhancedAlert: any = await Alert.findById(alert.id).populate(
-      'savedSearch',
-    );
+    const enhancedAlert: any = await Alert.findById(alert.id);
 
     // Process the alert - this should trigger the webhook
     const details: any = {
@@ -282,7 +280,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create saved search with a lucene filter that restricts to ServiceName = "web"
-    const savedSearch = await new SavedSearch({
+    const savedSearch = await createSavedSearchFixture({
       team: team._id,
       name: 'Filtered Error Logs',
       select: 'Body',
@@ -297,14 +295,14 @@ describe('Single Invocation Alert Test', () => {
           condition: 'ServiceName:"web"',
         },
       ],
-    }).save();
+    });
 
-    const webhook = await new Webhook({
+    const webhook = createWebhookFixture({
       team: team._id,
       service: 'slack',
       url: 'https://hooks.slack.com/services/test-filters',
       name: 'Test Webhook',
-    }).save();
+    });
 
     const mockUserId = new mongoose.Types.ObjectId();
     const alert = await createAlert(
@@ -356,9 +354,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate(
-      'savedSearch',
-    );
+    const enhancedAlert: any = await Alert.findById(alert.id);
 
     const details: any = {
       alert: enhancedAlert,
@@ -422,7 +418,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create saved search with a filter for a service that has no logs
-    const savedSearch = await new SavedSearch({
+    const savedSearch = await createSavedSearchFixture({
       team: team._id,
       name: 'No Match Filter',
       select: 'Body',
@@ -437,14 +433,14 @@ describe('Single Invocation Alert Test', () => {
           condition: 'ServiceName:"nonexistent-service"',
         },
       ],
-    }).save();
+    });
 
-    const webhook = await new Webhook({
+    const webhook = createWebhookFixture({
       team: team._id,
       service: 'slack',
       url: 'https://hooks.slack.com/services/test-no-match',
       name: 'Test Webhook',
-    }).save();
+    });
 
     const mockUserId = new mongoose.Types.ObjectId();
     const alert = await createAlert(
@@ -483,9 +479,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate(
-      'savedSearch',
-    );
+    const enhancedAlert: any = await Alert.findById(alert.id);
 
     const details: any = {
       alert: enhancedAlert,
@@ -544,7 +538,7 @@ describe('Single Invocation Alert Test', () => {
 
     // Create saved search with BOTH a where clause and a filter
     // where: only errors, filter: only "web" service
-    const savedSearch = await new SavedSearch({
+    const savedSearch = await createSavedSearchFixture({
       team: team._id,
       name: 'Where + Filter Search',
       select: 'Body',
@@ -559,14 +553,14 @@ describe('Single Invocation Alert Test', () => {
           condition: 'ServiceName:"web"',
         },
       ],
-    }).save();
+    });
 
-    const webhook = await new Webhook({
+    const webhook = createWebhookFixture({
       team: team._id,
       service: 'slack',
       url: 'https://hooks.slack.com/services/test-combined',
       name: 'Test Webhook',
-    }).save();
+    });
 
     const mockUserId = new mongoose.Types.ObjectId();
     const alert = await createAlert(
@@ -621,9 +615,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate(
-      'savedSearch',
-    );
+    const enhancedAlert: any = await Alert.findById(alert.id);
 
     const details: any = {
       alert: enhancedAlert,
@@ -709,7 +701,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create dashboard with multiple tiles - the alerting tile is NOT the first one
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'Multi-Tile Dashboard',
       team: team._id,
       tiles: [
@@ -760,15 +752,15 @@ describe('Single Invocation Alert Test', () => {
           },
         },
       ],
-    }).save();
+    });
 
     // Create webhook
-    const webhook = await new Webhook({
+    const webhook = createWebhookFixture({
       team: team._id,
       service: 'slack',
       url: 'https://hooks.slack.com/services/test123',
       name: 'Test Webhook',
-    }).save();
+    });
 
     // Create alert that references the SECOND tile (not the first)
     const mockUserId = new mongoose.Types.ObjectId();
@@ -790,9 +782,7 @@ describe('Single Invocation Alert Test', () => {
     );
 
     // Get enhanced alert with populated relations
-    const enhancedAlert: any = await Alert.findById(alert.id).populate(
-      'dashboard',
-    );
+    const enhancedAlert: any = await Alert.findById(alert.id);
 
     // Find the tile we're alerting on (should be the second tile)
     const tile = dashboard.tiles?.find((t: any) => t.id === 'second-tile-id');
@@ -873,14 +863,14 @@ describe('Single Invocation Alert Test', () => {
       password: config.CLICKHOUSE_PASSWORD,
     });
 
-    const webhook = await new Webhook({
+    const webhook = createWebhookFixture({
       team: team._id,
       service: 'slack',
       url: 'https://hooks.slack.com/services/test-number',
       name: 'Test Webhook',
-    }).save();
+    });
 
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'Number Chart Alert Dashboard',
       team: team._id,
       tiles: [
@@ -898,7 +888,7 @@ describe('Single Invocation Alert Test', () => {
           },
         },
       ],
-    }).save();
+    });
 
     const mockUserId = new mongoose.Types.ObjectId();
     const alert = await createAlert(
@@ -944,9 +934,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id).populate(
-      'savedSearch',
-    );
+    const enhancedAlert: any = await Alert.findById(alert.id);
 
     const tile = dashboard.tiles?.find((t: any) => t.id === 'number-tile-1');
 

@@ -1,5 +1,4 @@
 import { SourceKind } from '@hyperdx/common-utils/dist/types';
-import { ObjectId } from 'mongodb';
 
 import {
   getAgent,
@@ -8,9 +7,9 @@ import {
   randomMongoId,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook from '@/models/webhook';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { createWebhookFixture } from '@/test/sqliteMetadata';
+import { createSavedSearchFixture } from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
   createSourceFixture,
@@ -64,7 +63,7 @@ describe('iac router', () => {
 
     // Dashboard.provisioned is the unrelated machine-managed flag, not the
     // connection's platformProvisioned tri-state.
-    await Dashboard.create({
+    await createDashboardFixture({
       name: 'Provisioned',
       tiles: [],
       team: team._id,
@@ -82,12 +81,12 @@ describe('iac router', () => {
   it('marks a dashboard whose tiles cannot survive the round trip', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    await Dashboard.create({
+    await createDashboardFixture({
       name: 'Plain',
       tiles: [],
       team: team._id,
     });
-    await Dashboard.create({
+    await createDashboardFixture({
       name: 'Has PromQL',
       team: team._id,
       tiles: [
@@ -124,7 +123,7 @@ describe('iac router', () => {
   it('marks a dashboard whose only tile is a raw-SQL search', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    await Dashboard.create({
+    await createDashboardFixture({
       name: 'Raw SQL search',
       team: team._id,
       tiles: [
@@ -153,14 +152,14 @@ describe('iac router', () => {
   it('still serves the manifest when a stored tile is malformed', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    await Dashboard.create({
+    await createDashboardFixture({
       name: 'Healthy',
       team: team._id,
       tiles: [],
     });
-    await Dashboard.collection.insertOne({
+    createDashboardFixture({
       name: 'Corrupt',
-      team: new ObjectId(team._id),
+      team: team._id,
       tiles: [{ id: 'bad', x: 0, y: 0, w: 4, h: 2 }],
     });
 
@@ -195,7 +194,7 @@ describe('iac router', () => {
       defaultTableSelectExpression: 'Body',
     });
 
-    const savedSearch = await SavedSearch.create({
+    const savedSearch = await createSavedSearchFixture({
       team: team._id,
       name: 'Production errors',
       select: '',
@@ -214,7 +213,7 @@ describe('iac router', () => {
       channel: { type: null },
     });
 
-    await Webhook.create({
+    await createWebhookFixture({
       team: team._id,
       name: 'Ops Slack',
       service: 'slack',
@@ -265,7 +264,7 @@ describe('iac router', () => {
       h: 2,
       config: { name, displayType: 'line' },
     });
-    const dashboard = await Dashboard.create({
+    const dashboard = await createDashboardFixture({
       name: 'Ops',
       team: team._id,
       tiles: [
@@ -316,7 +315,7 @@ describe('iac router', () => {
   it('marks a tile alert on a provisioned dashboard', async () => {
     const { agent, team } = await getLoggedInAgent(server);
 
-    const dashboard = await Dashboard.create({
+    const dashboard = await createDashboardFixture({
       name: 'Provisioned',
       team: team._id,
       provisioned: true,
@@ -355,7 +354,7 @@ describe('iac router', () => {
   // both make the alert unimportable.
   it('marks a tile alert whose dashboard is gone or belongs to another team', async () => {
     const { agent, team } = await getLoggedInAgent(server);
-    const otherTeamDashboard = await Dashboard.create({
+    const otherTeamDashboard = await createDashboardFixture({
       name: 'Someone else',
       team: randomMongoId(),
       tiles: [
@@ -476,7 +475,7 @@ describe('iac router', () => {
     const { agent } = await getLoggedInAgent(server);
     const otherTeam = randomMongoId();
 
-    await Dashboard.create({
+    await createDashboardFixture({
       name: "Other team's dashboard",
       tiles: [],
       team: otherTeam,
@@ -494,7 +493,7 @@ describe('iac router', () => {
       host: 'http://elsewhere:8123',
       username: 'default',
     });
-    await Webhook.create({
+    await createWebhookFixture({
       team: otherTeam,
       name: "Other team's webhook",
       service: 'slack',

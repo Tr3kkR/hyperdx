@@ -9,6 +9,7 @@ import { ObjectId } from 'mongodb';
 import request from 'supertest';
 
 import * as config from '@/config';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as users from '@/db/repos/users';
 import {
   DEFAULT_DATABASE,
@@ -19,8 +20,14 @@ import {
   makeExternalTile,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import Webhook, { WebhookService } from '@/models/webhook';
+import { WebhookService } from '@/models/webhook';
+import {
+  countAllDashboardFixtures,
+  setDashboardTileFixture,
+} from '@/test/sqliteMetadata';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { findDashboardFixture } from '@/test/sqliteMetadata';
+import { createWebhookFixture } from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
   createSourceFixture,
@@ -212,12 +219,12 @@ describe('External API v2 Dashboards - old format', () => {
 
   // Helper to create a dashboard in the database
   const createTestDashboard = async (dashboardData = {}) => {
-    return new Dashboard({
+    return createDashboardFixture({
       name: 'Test Dashboard',
       tiles: [],
       team: team._id,
       ...dashboardData,
-    }).save();
+    });
   };
 
   // Helper to make authenticated requests
@@ -412,7 +419,7 @@ describe('External API v2 Dashboards - old format', () => {
       expect(response.body.data.filters).toEqual([]);
 
       // Verify dashboard was created in database
-      const dashboards = await Dashboard.find({}).lean();
+      const dashboards = dashboardsRepo.list(String(team._id));
       expect(dashboards).toHaveLength(1);
       expect(dashboards[0].name).toBe(mockDashboard.name);
       expect(dashboards[0].tiles).toHaveLength(2);
@@ -443,9 +450,7 @@ describe('External API v2 Dashboards - old format', () => {
         },
       ]);
 
-      const dashboardInDb = await Dashboard.findById(
-        response.body.data.id,
-      ).lean();
+      const dashboardInDb = await findDashboardFixture(response.body.data.id);
       expect(dashboardInDb?.savedQuery).toBe("service.name = 'api'");
       expect(dashboardInDb?.savedQueryLanguage).toBe('sql');
       expect(dashboardInDb?.savedFilterValues).toEqual([
@@ -471,9 +476,7 @@ describe('External API v2 Dashboards - old format', () => {
       expect(response.body.data.savedQuery).toBe("service.name = 'api'");
       expect(response.body.data.savedQueryLanguage).toBe('lucene');
 
-      const dashboardInDb = await Dashboard.findById(
-        response.body.data.id,
-      ).lean();
+      const dashboardInDb = await findDashboardFixture(response.body.data.id);
       expect(dashboardInDb?.savedQueryLanguage).toBe('lucene');
     });
 
@@ -1037,9 +1040,7 @@ describe('External API v2 Dashboards - old format', () => {
       expect(Array.isArray(response.body.data.filters)).toBe(true);
 
       // Verify dashboard was updated in database
-      const updatedDashboardInDb = await Dashboard.findById(
-        dashboard._id,
-      ).lean();
+      const updatedDashboardInDb = await findDashboardFixture(dashboard._id);
       expect(updatedDashboardInDb?.name).toBe('Updated Dashboard Name');
       expect(updatedDashboardInDb?.tiles).toHaveLength(2);
     });
@@ -1067,11 +1068,9 @@ describe('External API v2 Dashboards - old format', () => {
       expect(response.body.data.savedQueryLanguage).toBeNull();
       expect(response.body.data.savedFilterValues).toEqual([]);
 
-      const updatedDashboardInDb = await Dashboard.findById(
-        dashboard._id,
-      ).lean();
-      expect(updatedDashboardInDb?.savedQuery).toBeNull();
-      expect(updatedDashboardInDb?.savedQueryLanguage).toBeNull();
+      const updatedDashboardInDb = await findDashboardFixture(dashboard._id);
+      expect(updatedDashboardInDb?.savedQuery).toBeUndefined();
+      expect(updatedDashboardInDb?.savedQueryLanguage).toBeUndefined();
       expect(updatedDashboardInDb?.savedFilterValues).toEqual([]);
     });
 
@@ -1990,12 +1989,12 @@ describe('External API v2 Dashboards - new format', () => {
 
   // Helper to create a dashboard in the database
   const createTestDashboard = async (dashboardData = {}) => {
-    return new Dashboard({
+    return createDashboardFixture({
       name: 'Test Dashboard',
       tiles: [],
       team: team._id,
       ...dashboardData,
-    }).save();
+    });
   };
 
   // Helper to make authenticated requests
@@ -2181,7 +2180,7 @@ describe('External API v2 Dashboards - new format', () => {
       expect(response.body.data.filters).toEqual([]);
 
       // Verify dashboard was created in database
-      const dashboards = await Dashboard.find({}).lean();
+      const dashboards = dashboardsRepo.list(String(team._id));
       expect(dashboards).toHaveLength(1);
       expect(dashboards[0].name).toBe(mockDashboard.name);
       expect(dashboards[0].tiles).toHaveLength(2);
@@ -2962,9 +2961,7 @@ describe('External API v2 Dashboards - new format', () => {
         })
         .expect(200);
 
-      const dashboardInDb = await Dashboard.findById(
-        response.body.data.id,
-      ).lean();
+      const dashboardInDb = await findDashboardFixture(response.body.data.id);
 
       expect((dashboardInDb!.tiles[0].config as any).where).toBe('');
     });
@@ -2991,9 +2988,7 @@ describe('External API v2 Dashboards - new format', () => {
         })
         .expect(200);
 
-      const dashboardInDb = await Dashboard.findById(
-        response.body.data.id,
-      ).lean();
+      const dashboardInDb = await findDashboardFixture(response.body.data.id);
 
       expect(
         (dashboardInDb!.tiles[0].config as any).select[0].aggCondition,
@@ -3009,7 +3004,7 @@ describe('External API v2 Dashboards - new format', () => {
       // (which would cause silent data loss on a GET -> mutate -> PUT
       // round-trip), and must preserve `displayType: 'heatmap'` so the
       // breakage surfaces on re-PUT instead of being overwritten.
-      const corruptedHeatmapDashboard = await new Dashboard({
+      const corruptedHeatmapDashboard = createDashboardFixture({
         name: 'Dashboard with corrupted heatmap',
         team: team._id,
         tiles: [
@@ -3038,7 +3033,7 @@ describe('External API v2 Dashboards - new format', () => {
             },
           },
         ],
-      }).save();
+      });
 
       const response = await authRequest(
         'get',
@@ -3452,11 +3447,11 @@ describe('External API v2 Dashboards - new format', () => {
     });
 
     it('should return 400 when an onClick dashboard belongs to another team', async () => {
-      const otherTeamDashboard = await new Dashboard({
+      const otherTeamDashboard = createDashboardFixture({
         name: 'Other Team Dashboard',
         tiles: [],
         team: new ObjectId(),
-      }).save();
+      });
 
       const response = await authRequest('post', BASE_URL)
         .send({
@@ -3777,7 +3772,7 @@ describe('External API v2 Dashboards - new format', () => {
       ).expect(200);
       expect(getResponse.body.data.filters).toEqual(response.body.data.filters);
 
-      const stored = await Dashboard.findById(response.body.data.id).lean();
+      const stored = await findDashboardFixture(response.body.data.id);
       expect(stored?.filters).toMatchObject([
         {
           source: traceSource._id.toString(),
@@ -3867,9 +3862,7 @@ describe('External API v2 Dashboards - new format', () => {
       expect(Array.isArray(response.body.data.filters)).toBe(true);
 
       // Verify dashboard was updated in database
-      const updatedDashboardInDb = await Dashboard.findById(
-        dashboard._id,
-      ).lean();
+      const updatedDashboardInDb = await findDashboardFixture(dashboard._id);
       expect(updatedDashboardInDb?.name).toBe('Updated Dashboard Name');
       expect(updatedDashboardInDb?.tiles).toHaveLength(2);
     });
@@ -4125,7 +4118,7 @@ describe('External API v2 Dashboards - new format', () => {
         variableName: 'Service_Name',
       });
 
-      const stored = await Dashboard.findById(dashboard._id).lean();
+      const stored = await findDashboardFixture(dashboard._id);
       expect(stored?.filters?.[0]).toMatchObject({
         id: filterId,
         isBroadcastEnabled: false,
@@ -4181,7 +4174,7 @@ describe('External API v2 Dashboards - new format', () => {
       );
       expect(response.body.data.filters[0]).not.toHaveProperty('variableName');
 
-      const stored = await Dashboard.findById(dashboard._id).lean();
+      const stored = await findDashboardFixture(dashboard._id);
       expect(stored?.filters?.[0]).not.toHaveProperty('isVariableEnabled');
       expect(stored?.filters?.[0]).not.toHaveProperty('variableName');
     });
@@ -4256,7 +4249,7 @@ describe('External API v2 Dashboards - new format', () => {
 
       // The re-PUT persists the healed filters, dropping the fields the
       // stored document carried in the mode that ignored them.
-      const stored = await Dashboard.findById(dashboard._id).lean();
+      const stored = await findDashboardFixture(dashboard._id);
       expect(stored?.filters?.[0]).not.toHaveProperty('appliesToSourceIds');
       expect(stored?.filters?.[1]).not.toHaveProperty('variableName');
     });
@@ -5100,7 +5093,7 @@ describe('External API v2 Dashboards - new format', () => {
         ],
       });
 
-      const webhook = await Webhook.create({
+      const webhook = await createWebhookFixture({
         name: 'Test Webhook',
         service: WebhookService.Slack,
         url: 'https://hooks.slack.com/test',
@@ -5206,7 +5199,7 @@ describe('External API v2 Dashboards - new format', () => {
         ],
       });
 
-      const webhook = await Webhook.create({
+      const webhook = await createWebhookFixture({
         name: 'Test Webhook',
         service: WebhookService.Slack,
         url: 'https://hooks.slack.com/test',
@@ -6304,10 +6297,9 @@ describe('External API v2 Dashboards - new format', () => {
       // Simulate a tile saved during the #2265 window by writing a legacy
       // numeric token directly to Mongo (the `tiles` field is `Mixed`, so
       // this bypasses the create-path enum).
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        { $set: { 'tiles.0.config.color': 'chart-1' } },
-      );
+      setDashboardTileFixture(dashboardId, {
+        'tiles.0.config.color': 'chart-1',
+      });
 
       const get = await authRequest('get', `${BASE_URL}/${dashboardId}`).expect(
         200,
@@ -6326,17 +6318,12 @@ describe('External API v2 Dashboards - new format', () => {
       // name on read) and an unrecognized token (dropped on read so the
       // response stays within the palette-token enum). Neither is reachable
       // through the validated create path.
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        {
-          $set: {
-            'tiles.0.config.colorRules': [
-              { operator: 'gt', value: 1, color: 'chart-1' },
-              { operator: 'gt', value: 2, color: 'not-a-token' },
-            ],
-          },
-        },
-      );
+      setDashboardTileFixture(dashboardId, {
+        'tiles.0.config.colorRules': [
+          { operator: 'gt', value: 1, color: 'chart-1' },
+          { operator: 'gt', value: 2, color: 'not-a-token' },
+        ],
+      });
 
       const get = await authRequest('get', `${BASE_URL}/${dashboardId}`).expect(
         200,
@@ -6356,16 +6343,11 @@ describe('External API v2 Dashboards - new format', () => {
       // Direct Mongo write of an unresolvable token (not reachable via the
       // validated create path); the only rule drops, so the field is omitted
       // rather than returned as an empty array.
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        {
-          $set: {
-            'tiles.0.config.colorRules': [
-              { operator: 'gt', value: 1, color: 'not-a-token' },
-            ],
-          },
-        },
-      );
+      setDashboardTileFixture(dashboardId, {
+        'tiles.0.config.colorRules': [
+          { operator: 'gt', value: 1, color: 'not-a-token' },
+        ],
+      });
 
       const get = await authRequest('get', `${BASE_URL}/${dashboardId}`).expect(
         200,
@@ -6377,10 +6359,9 @@ describe('External API v2 Dashboards - new format', () => {
       const create = await postRawSqlTile({ color: 'chart-blue' }).expect(200);
       const dashboardId = create.body.data.id;
 
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        { $set: { 'tiles.0.config.color': 'chart-4' } },
-      );
+      setDashboardTileFixture(dashboardId, {
+        'tiles.0.config.color': 'chart-4',
+      });
 
       const get = await authRequest('get', `${BASE_URL}/${dashboardId}`).expect(
         200,
@@ -6395,17 +6376,12 @@ describe('External API v2 Dashboards - new format', () => {
       }).expect(200);
       const dashboardId = create.body.data.id;
 
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        {
-          $set: {
-            'tiles.0.config.colorRules': [
-              { operator: 'gt', value: 1, color: 'chart-1' },
-              { operator: 'gt', value: 2, color: 'not-a-token' },
-            ],
-          },
-        },
-      );
+      setDashboardTileFixture(dashboardId, {
+        'tiles.0.config.colorRules': [
+          { operator: 'gt', value: 1, color: 'chart-1' },
+          { operator: 'gt', value: 2, color: 'not-a-token' },
+        ],
+      });
 
       const get = await authRequest('get', `${BASE_URL}/${dashboardId}`).expect(
         200,
@@ -6691,7 +6667,7 @@ describe('External API v2 Dashboards - new format', () => {
       expect(get.body.data.tiles[0].config.select).toHaveLength(2);
 
       // The internal saved config is self-describing about hidden operands.
-      const saved = await Dashboard.findById(create.body.data.id).lean();
+      const saved = await findDashboardFixture(create.body.data.id);
       const savedConfig = saved!.tiles[0].config;
       expect(
         isBuilderSavedChartConfig(savedConfig) && savedConfig.showOperandSeries,
@@ -7434,10 +7410,10 @@ describe('External API v2 Dashboards - new format', () => {
       const dashboardId = created.body.data.id;
 
       // Mutate Mongo directly to simulate the legacy state.
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        { $set: { 'tiles.0.containerId': '', 'tiles.0.tabId': '' } },
-      );
+      setDashboardTileFixture(dashboardId, {
+        'tiles.0.containerId': '',
+        'tiles.0.tabId': '',
+      });
 
       const getResp = await authRequest(
         'get',
@@ -7567,15 +7543,10 @@ describe('External API v2 Dashboards - new format', () => {
       // `Mixed`, so the model layer doesn't enforce ref consistency;
       // historical writes (or future bugs) can leave the doc in this
       // shape.
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        {
-          $set: {
-            'tiles.0.containerId': 'ghost-container',
-            'tiles.0.tabId': 'ghost-tab',
-          },
-        },
-      );
+      setDashboardTileFixture(dashboardId, {
+        'tiles.0.containerId': 'ghost-container',
+        'tiles.0.tabId': 'ghost-tab',
+      });
 
       const getResp = await authRequest(
         'get',
@@ -7618,10 +7589,7 @@ describe('External API v2 Dashboards - new format', () => {
 
       // Replace the tile's tabId with one that doesn't exist in the
       // container.
-      await Dashboard.updateOne(
-        { _id: dashboardId },
-        { $set: { 'tiles.0.tabId': 'ghost-tab' } },
-      );
+      setDashboardTileFixture(dashboardId, { 'tiles.0.tabId': 'ghost-tab' });
 
       const getResp = await authRequest(
         'get',
@@ -7652,9 +7620,7 @@ describe('External API v2 Dashboards - new format', () => {
 
       expect(response.body.data.savedFilterValues).toEqual([variableValue]);
 
-      const dashboardInDb = await Dashboard.findById(
-        response.body.data.id,
-      ).lean();
+      const dashboardInDb = await findDashboardFixture(response.body.data.id);
       expect(dashboardInDb?.savedFilterValues).toEqual([variableValue]);
     });
 
@@ -7742,7 +7708,7 @@ describe('External API v2 Dashboards - new format', () => {
       await authRequest('delete', `${BASE_URL}/${dashboard._id}`).expect(200);
 
       // Verify dashboard was deleted
-      const deletedDashboard = await Dashboard.findById(dashboard._id);
+      const deletedDashboard = await findDashboardFixture(dashboard._id);
       expect(deletedDashboard).toBeNull();
     });
   });
@@ -7798,12 +7764,12 @@ describe('External API v2 Dashboards - new format', () => {
     });
 
     it('does not persist (dashboard count unchanged)', async () => {
-      const before = await Dashboard.countDocuments({});
+      const before = countAllDashboardFixtures();
       await authRequest('post', `${BASE_URL}/validate`).send({
         name: 'D',
         tiles: [],
       });
-      expect(await Dashboard.countDocuments({})).toBe(before);
+      expect(countAllDashboardFixtures()).toBe(before);
     });
   });
 });

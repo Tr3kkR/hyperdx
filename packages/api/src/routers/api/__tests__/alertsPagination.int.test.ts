@@ -2,6 +2,7 @@ import { AlertThresholdType } from '@hyperdx/common-utils/dist/types';
 import mongoose from 'mongoose';
 
 import * as User from '@/db/repos/users';
+import type { WebhookDoc } from '@/db/repos/webhooks';
 import {
   getLoggedInAgent,
   getServer,
@@ -9,8 +10,9 @@ import {
   randomMongoId,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
+import { WebhookService } from '@/models/webhook';
+import { createWebhookFixture } from '@/test/sqliteMetadata';
+import { createSavedSearchFixture } from '@/test/sqliteMetadata';
 
 const MOCK_TILES = [makeTile()];
 
@@ -19,7 +21,7 @@ describe('alerts list paging and filtering', () => {
   let agent: Awaited<ReturnType<typeof getLoggedInAgent>>['agent'];
   let team: Awaited<ReturnType<typeof getLoggedInAgent>>['team'];
   let user: Awaited<ReturnType<typeof getLoggedInAgent>>['user'];
-  let webhook: WebhookDocument;
+  let webhook: WebhookDoc;
   let dashboardId: string;
 
   beforeAll(async () => {
@@ -31,7 +33,7 @@ describe('alerts list paging and filtering', () => {
     agent = result.agent;
     team = result.team;
     user = result.user;
-    webhook = await Webhook.create({
+    webhook = await createWebhookFixture({
       name: 'Test Webhook',
       service: WebhookService.Slack,
       url: 'https://hooks.slack.com/test',
@@ -109,7 +111,7 @@ describe('alerts list paging and filtering', () => {
     });
 
     it('still populates the referenced dashboard, saved search and creator', async () => {
-      const savedSearch = await SavedSearch.create({
+      const savedSearch = await createSavedSearchFixture({
         name: 'Checkout errors',
         source: new mongoose.Types.ObjectId(),
         team: team._id,
@@ -294,7 +296,7 @@ describe('alerts list paging and filtering', () => {
     });
 
     it('matches documents with no source field when filtering by saved_search', async () => {
-      const savedSearch = await SavedSearch.create({
+      const savedSearch = await createSavedSearchFixture({
         name: 'Legacy search',
         source: new mongoose.Types.ObjectId(),
         team: team._id,

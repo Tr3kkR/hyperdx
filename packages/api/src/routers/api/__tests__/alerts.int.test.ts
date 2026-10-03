@@ -6,6 +6,7 @@ import {
 } from '@hyperdx/common-utils/dist/types';
 import mongoose from 'mongoose';
 
+import type { WebhookDoc } from '@/db/repos/webhooks';
 import {
   getLoggedInAgent,
   getServer,
@@ -22,9 +23,10 @@ import {
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
 import AlertHistory from '@/models/alertHistory';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
+import { WebhookService } from '@/models/webhook';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { createWebhookFixture } from '@/test/sqliteMetadata';
+import { createSavedSearchFixture } from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
   createSourceFixture,
@@ -44,7 +46,7 @@ describe('alerts router', () => {
   let agent: Awaited<ReturnType<typeof getLoggedInAgent>>['agent'];
   let team: Awaited<ReturnType<typeof getLoggedInAgent>>['team'];
   let user: Awaited<ReturnType<typeof getLoggedInAgent>>['user'];
-  let webhook: WebhookDocument;
+  let webhook: WebhookDoc;
 
   beforeAll(async () => {
     await server.start();
@@ -55,7 +57,7 @@ describe('alerts router', () => {
     agent = result.agent;
     team = result.team;
     user = result.user;
-    webhook = await Webhook.create({
+    webhook = await createWebhookFixture({
       name: 'Test Webhook',
       service: WebhookService.Slack,
       url: 'https://hooks.slack.com/test',
@@ -263,7 +265,7 @@ describe('alerts router', () => {
   });
 
   it('can update an ungrouped saved-search alert returned with null groupBy', async () => {
-    const savedSearch = await SavedSearch.create({
+    const savedSearch = await createSavedSearchFixture({
       name: 'Test Saved Search',
       source: new mongoose.Types.ObjectId(),
       team: team._id,
@@ -302,7 +304,7 @@ describe('alerts router', () => {
       .send(MOCK_DASHBOARD)
       .expect(200);
     const tileId = dashboard.body.tiles[0].id;
-    const savedSearch = await SavedSearch.create({
+    const savedSearch = await createSavedSearchFixture({
       name: 'Test Saved Search',
       source: new mongoose.Types.ObjectId(),
       team: team._id,
@@ -521,7 +523,7 @@ describe('alerts router', () => {
   });
 
   it('Derives name and tags from the saved search for a document stored without them', async () => {
-    const savedSearch = await SavedSearch.create({
+    const savedSearch = await createSavedSearchFixture({
       name: 'Legacy search',
       source: new mongoose.Types.ObjectId(),
       team: team._id,
@@ -920,7 +922,7 @@ describe('alerts router', () => {
   // only because the marker sits outside the `alert.dashboard` spread.
   it('marks a tile alert on a provisioned dashboard, and one whose dashboard is gone', async () => {
     const tile = makeTile();
-    const provisioned = await Dashboard.create({
+    const provisioned = await createDashboardFixture({
       name: 'Provisioned',
       team: team._id,
       provisioned: true,
@@ -1742,14 +1744,14 @@ describe('alerts router', () => {
   });
   describe('multiple notification channels', () => {
     const makeSavedSearch = () =>
-      SavedSearch.create({
+      createSavedSearchFixture({
         name: 'Test Saved Search',
         source: new mongoose.Types.ObjectId(),
         team: team._id,
       });
 
     const secondWebhook = () =>
-      Webhook.create({
+      createWebhookFixture({
         name: 'Second Webhook',
         service: WebhookService.Slack,
         url: 'https://hooks.slack.com/second',
@@ -1887,7 +1889,7 @@ describe('alerts router', () => {
         .expect(400);
 
       // a webhook belonging to another team, hidden among valid ones
-      const foreign = await Webhook.create({
+      const foreign = await createWebhookFixture({
         name: 'Foreign Webhook',
         service: WebhookService.Slack,
         url: 'https://hooks.slack.com/foreign',

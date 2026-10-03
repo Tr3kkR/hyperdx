@@ -62,7 +62,7 @@ import AlertHistory, {
 import { IDashboard } from '@/models/dashboard';
 import { ISavedSearch } from '@/models/savedSearch';
 type ISource = TSource & { team: string };
-import { IWebhook } from '@/models/webhook';
+import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import {
   isClientTimeoutOrAbortError,
   isQueryTimeoutError,

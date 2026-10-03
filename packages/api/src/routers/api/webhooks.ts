@@ -14,6 +14,8 @@ import { z } from 'zod';
 import { validateRequest } from 'zod-express-middleware';
 
 import { createWebhook, deleteWebhook } from '@/controllers/webhook';
+import type { WebhookDoc } from '@/db/repos/webhooks';
+import * as webhooksRepo from '@/db/repos/webhooks';
 import { AlertSource, AlertState } from '@/models/alert';
 import Webhook, { WebhookService } from '@/models/webhook';
 import {
@@ -82,12 +84,15 @@ type WebhookPlain = Pick<
   'url' | 'headers' | 'queryParams' | 'service'
 >;
 
-const toWebhookPlain = (doc: mongoose.Document): WebhookPlain =>
-  doc.toJSON({ flattenMaps: true }) as WebhookPlain;
+const toWebhookPlain = (doc: WebhookDoc): WebhookPlain => doc;
 
-const serializeWebhook = (doc: mongoose.Document): WebhookApiData => {
-  const { team: _team, __v, ...data } = doc.toJSON({ flattenMaps: true });
-  return data as WebhookApiData;
+const serializeWebhook = (doc: WebhookDoc): WebhookApiData => {
+  const { team: _team, ...data } = doc;
+  return {
+    ...data,
+    createdAt: doc.createdAt.toISOString(),
+    updatedAt: doc.updatedAt.toISOString(),
+  };
 };
 
 const mergeRedactedMap = (
@@ -148,10 +153,7 @@ router.get(
         return res.sendStatus(403);
       }
       const { service } = req.query;
-      const webhooks = await Webhook.find(
-        { team: teamId, service },
-        { __v: 0, team: 0 },
-      );
+      const webhooks = webhooksRepo.list(teamId.toString(), service);
       res.json({
         data: webhooks.map(w => sanitizeWebhook(serializeWebhook(w))),
       });
@@ -193,7 +195,7 @@ router.post(
       // The unique index is on (team, service, name), so the pre-flight check
       // must query the same fields — otherwise a name+service collision slips
       // past this guard and surfaces as an uncaught duplicate-key 500 below.
-      if (await Webhook.findOne({ team: teamId, service, name })) {
+      if (webhooksRepo.findByName(teamId.toString(), service, name)) {
         return res.status(400).json({
           message: 'Webhook already exists',
         });
@@ -258,10 +260,7 @@ router.put(
         req.body;
       const { id } = req.params;
 
-      const existingWebhook = await Webhook.findOne({
-        _id: id,
-        team: teamId,
-      });
+      const existingWebhook = webhooksRepo.findById(id, teamId.toString());
       if (!existingWebhook) {
         return res.status(404).json({
           message: 'Webhook not found',
@@ -304,51 +303,34 @@ router.put(
 
       // Match the unique index (team, service, name) so a rename onto an
       // existing (service, name) is caught here rather than as a 500 below.
-      const duplicateWebhook = await Webhook.findOne({
-        team: teamId,
+      const duplicateWebhook = webhooksRepo.findByName(
+        teamId.toString(),
         service,
         name,
-        _id: { $ne: id },
-      });
+        id,
+      );
       if (duplicateWebhook) {
         return res.status(400).json({
           message: 'A webhook with this service and name already exists',
         });
       }
 
-      // $unset is required for Mongoose Map fields — $set with undefined
-      // does not remove a Map field from the document.
-      const $set: Record<string, unknown> = {
-        name,
-        service,
-        url: resolvedUrl,
-        description,
-        body,
-      };
-      const $unset: Record<string, 1> = {};
-
-      if (resolvedHeaders !== undefined) {
-        $set.headers = resolvedHeaders;
-      } else {
-        $unset.headers = 1;
-      }
-      if (resolvedQueryParams !== undefined) {
-        $set.queryParams = resolvedQueryParams;
-      } else {
-        $unset.queryParams = 1;
-      }
-
-      const updateOp: Record<string, unknown> = { $set };
-      if (Object.keys($unset).length > 0) {
-        updateOp.$unset = $unset;
-      }
-
       // Condition on stored URL so a concurrent PUT that changes the
       // destination between read and write is detected (TOCTOU guard).
-      const updatedWebhook = await Webhook.findOneAndUpdate(
-        { _id: id, team: teamId, url: existingPlain.url },
-        updateOp,
-        { new: true, select: { __v: 0, team: 0 } },
+      const updatedWebhook = webhooksRepo.updateIfDestinationMatches(
+        id,
+        teamId.toString(),
+        existingPlain.url,
+        existingPlain.service,
+        {
+          name,
+          service,
+          url: resolvedUrl,
+          description,
+          body,
+          headers: resolvedHeaders,
+          queryParams: resolvedQueryParams,
+        },
       );
 
       if (!updatedWebhook) {
@@ -437,10 +419,7 @@ router.post(
       // only when the submitted URL still points at the stored destination.
       // This prevents exfiltrating stored secrets to an attacker-controlled URL.
       if (webhookId) {
-        const existing = await Webhook.findOne({
-          _id: webhookId,
-          team: teamId,
-        });
+        const existing = webhooksRepo.findById(webhookId, teamId.toString());
         if (!existing) {
           return res.status(404).json({ message: 'Webhook not found' });
         }

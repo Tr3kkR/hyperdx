@@ -29,7 +29,7 @@ import {
 import { alertsPageQuerySchema, getAlertsPage } from '@/controllers/alertsPage';
 import { AlertSource, getAlertChannels } from '@/models/alert';
 import { IAlertHistory } from '@/models/alertHistory';
-import { resolveAlertDisplayFields } from '@/utils/alerts';
+import { populatedRefOrNull, resolveAlertDisplayFields } from '@/utils/alerts';
 import { setBusinessContext } from '@/utils/instrumentation';
 import { PreSerialized, sendJson } from '@/utils/serialization';
 import { internalAlertSchema, objectIdSchema } from '@/utils/zod';
@@ -43,6 +43,8 @@ const formatAlertResponse = (
   history: Omit<IAlertHistory, 'alert'>[],
   { includeChartConfig = false }: { includeChartConfig?: boolean } = {},
 ): PreSerialized<AlertsPageItem> => {
+  const dashboard = populatedRefOrNull(alert.dashboard);
+  const savedSearch = populatedRefOrNull(alert.savedSearch);
   return {
     history,
     // Resolved (stored ?? derived) so alerts written before the fields existed
@@ -77,11 +79,11 @@ const formatAlertResponse = (
     isTileAlertUnaddressable(alert.dashboard ?? undefined, alert.tileId)
       ? { unaddressableTile: true }
       : {}),
-    ...(alert.dashboard && {
-      dashboardId: alert.dashboard._id,
+    ...(dashboard && {
+      dashboardId: dashboard._id,
       dashboard: {
-        name: alert.dashboard.name,
-        tiles: alert.dashboard.tiles
+        name: dashboard.name,
+        tiles: dashboard.tiles
           .filter(tile => tile.id === alert.tileId)
           .map(tile => ({
             id: tile.id,
@@ -89,9 +91,9 @@ const formatAlertResponse = (
           })),
       },
     }),
-    ...(alert.savedSearch && {
-      savedSearchId: alert.savedSearch._id,
-      savedSearch: { name: alert.savedSearch.name },
+    ...(savedSearch && {
+      savedSearchId: savedSearch._id,
+      savedSearch: { name: savedSearch.name },
     }),
     // Inline alerts carry their persisted config so edit surfaces can seed
     // the chart editor and the detail page can render the query — but only on

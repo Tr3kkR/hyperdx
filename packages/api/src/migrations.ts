@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
+import * as dashboardsRepo from '@/db/repos/dashboards';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import Alert, { IAlert } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
 import { deriveAlertDisplayFields } from '@/utils/alerts';
 import logger from '@/utils/logger';
 
@@ -44,16 +44,10 @@ export async function backfillAlertDisplayFields() {
     const dashboardIds = batch.map(a => a.dashboard).filter(id => id != null);
     const [savedSearches, dashboards] = await Promise.all([
       savedSearchIds.length > 0
-        ? SavedSearch.find(
-            { _id: { $in: savedSearchIds } },
-            { name: 1, tags: 1 },
-          ).lean()
+        ? savedSearchesRepo.findManyByIds(savedSearchIds.map(String))
         : [],
       dashboardIds.length > 0
-        ? Dashboard.find(
-            { _id: { $in: dashboardIds } },
-            { name: 1, tags: 1, 'tiles.id': 1, 'tiles.config.name': 1 },
-          ).lean()
+        ? dashboardsRepo.findManyByIds(dashboardIds.map(String))
         : [],
     ]);
     const savedSearchById = new Map(

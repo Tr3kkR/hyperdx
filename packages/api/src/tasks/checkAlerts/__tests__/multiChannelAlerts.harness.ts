@@ -2,10 +2,11 @@ import { ClickhouseClient } from '@hyperdx/common-utils/dist/clickhouse/node';
 import ms from 'ms';
 
 import * as config from '@/config';
+import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import { bulkInsertLogs } from '@/fixtures';
 import Alert from '@/models/alert';
 import { SavedSearch } from '@/models/savedSearch';
-import Webhook, { IWebhook } from '@/models/webhook';
+import Webhook from '@/models/webhook';
 import { processAlert } from '@/tasks/checkAlerts';
 import { AlertTaskType } from '@/tasks/checkAlerts/providers';
 import {
@@ -116,8 +117,7 @@ export const runAlert = async ({
   savedSearch: any;
   webhooks: IWebhook[];
 }) => {
-  const enhancedAlert: any =
-    await Alert.findById(alertId).populate('savedSearch');
+  const enhancedAlert: any = await Alert.findById(alertId);
   const details: any = {
     alert: enhancedAlert,
     source,

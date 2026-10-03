@@ -12,19 +12,22 @@ import { z } from 'zod';
 
 import { recordOnboardingTaskCompletion } from '@/controllers/user';
 import * as connectionsRepo from '@/db/repos/connections';
+import * as dashboardsRepo from '@/db/repos/dashboards';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import * as sourcesRepo from '@/db/repos/sources';
 import type { UserDoc as IUser } from '@/db/repos/users';
 import { hydrateUsers } from '@/db/repos/users';
+import * as webhooksRepo from '@/db/repos/webhooks';
 import type { ObjectId } from '@/models';
 import Alert, {
   AlertChannel,
+  type AlertDocument,
   AlertSource,
   getAlertChannels,
   IAlert,
 } from '@/models/alert';
-import Dashboard, { IDashboard } from '@/models/dashboard';
-import { ISavedSearch, SavedSearch } from '@/models/savedSearch';
-import Webhook from '@/models/webhook';
+import { IDashboard } from '@/models/dashboard';
+import { ISavedSearch } from '@/models/savedSearch';
 import { type AlertRefs, deriveAlertDisplayFields } from '@/utils/alerts';
 import { Api400Error } from '@/utils/errors';
 import { internalAlertSchema, objectIdSchema } from '@/utils/zod';
@@ -76,10 +79,10 @@ export const validateAlertInput = async (
   if (alertInput.source === AlertSource.TILE) {
     validateObjectId(alertInput.dashboardId, 'Invalid dashboard ID');
 
-    const dashboard = await Dashboard.findOne({
-      _id: alertInput.dashboardId,
-      team: teamId,
-    });
+    const dashboard = dashboardsRepo.findById(
+      String(alertInput.dashboardId),
+      String(teamId),
+    );
 
     if (dashboard == null) {
       throw new Api400Error('Dashboard not found');
@@ -111,10 +114,10 @@ export const validateAlertInput = async (
   if (alertInput.source === AlertSource.SAVED_SEARCH) {
     validateObjectId(alertInput.savedSearchId, 'Invalid saved search ID');
 
-    const savedSearch = await SavedSearch.findOne({
-      _id: alertInput.savedSearchId,
-      team: teamId,
-    });
+    const savedSearch = savedSearchesRepo.findById(
+      alertInput.savedSearchId!,
+      String(teamId),
+    );
 
     if (savedSearch == null) {
       throw new Api400Error('Saved search not found');
@@ -226,10 +229,7 @@ export const validateAlertInput = async (
     validateObjectId(webhookId, 'Invalid webhook ID');
   }
   const uniqueIds = [...new Set(webhookIds)];
-  const found = await Webhook.countDocuments({
-    _id: { $in: uniqueIds },
-    team: teamId,
-  });
+  const found = webhooksRepo.countIds(String(teamId), uniqueIds);
   if (found !== uniqueIds.length) {
     throw new Api400Error('Webhook not found');
   }
@@ -480,28 +480,35 @@ export const deleteSavedSearchAlerts = async (
   });
 };
 
-/** Represents the documents populated and projected by getAlert[s]WithDisplayRefs */
-type AlertWithDisplayRefs = {
-  savedSearch: Pick<ISavedSearch, '_id' | 'name' | 'tags'> | null;
-  dashboard: Pick<IDashboard, '_id' | 'name' | 'tags' | 'tiles'> | null;
-};
-
-/** Minimal projections to support deriving alert names from referenced searches and dashboard tiles  */
-const DISPLAY_REF_POPULATE = [
-  { path: 'savedSearch', select: 'name tags' },
-  { path: 'dashboard', select: 'name tags tiles.id tiles.config.name' },
-];
+export function withDisplayRefs(alert: AlertDocument) {
+  const plain = alert.toObject({ virtuals: true });
+  const team = String(alert.team);
+  const savedSearch =
+    alert.savedSearch == null
+      ? null
+      : (savedSearchesRepo
+          .findManyByIds([String(alert.savedSearch)])
+          .find(search => search.team === team) ?? alert.savedSearch);
+  const dashboard =
+    alert.dashboard == null
+      ? null
+      : (dashboardsRepo.findById(String(alert.dashboard), team) ??
+        alert.dashboard);
+  // sqlite-port: Mongoose populate for SavedSearch and Dashboard is an explicit
+  // lookup of the SQLite parent rows while Alert still lives in Mongo.
+  return { ...plain, savedSearch, dashboard };
+}
 
 /** Get alerts, with a populated (and projected) search or dashboard reference */
 export const getAlertsWithDisplayRefs = async (
   teamId: ObjectId,
   { limit, offset }: { limit: number; offset: number },
 ) => {
-  return Alert.find({ team: teamId })
+  const alerts = await Alert.find({ team: teamId })
     .sort({ _id: 1 })
     .skip(offset)
-    .limit(limit)
-    .populate<AlertWithDisplayRefs>(DISPLAY_REF_POPULATE);
+    .limit(limit);
+  return alerts.map(withDisplayRefs);
 };
 
 /** Get alert, with a populated (and projected) search or dashboard reference */
@@ -509,10 +516,11 @@ export const getAlertWithDisplayRefs = async (
   alertId: ObjectId | string,
   teamId: ObjectId | string,
 ) => {
-  return Alert.findOne({
+  const alert = await Alert.findOne({
     _id: alertId,
     team: teamId,
-  }).populate<AlertWithDisplayRefs>(DISPLAY_REF_POPULATE);
+  });
+  return alert ? withDisplayRefs(alert) : null;
 };
 
 /** Represents the documents populated and projected by ALERT_PAGE_POPULATE */
@@ -534,14 +542,6 @@ export type AlertPageRefs = {
  * Projections for the internal alerts surfaces (the alerts page and the alert
  * detail endpoint), kept to what the response actually renders.
  */
-export const ALERT_PAGE_POPULATE = [
-  { path: 'savedSearch', select: 'name tags' },
-  {
-    path: 'dashboard',
-    select: 'name provisioned tags tiles.id tiles.config.name',
-  },
-];
-
 export const getAlertEnhanced = async (
   alertId: ObjectId | string,
   teamId: ObjectId,
@@ -549,13 +549,13 @@ export const getAlertEnhanced = async (
   const alert = await Alert.findOne({
     _id: alertId,
     team: teamId,
-  }).populate<AlertPageRefs>(ALERT_PAGE_POPULATE);
+  });
   if (!alert) return null;
   const plain = hydrateUsers(
-    [alert.toObject({ virtuals: true })],
+    [withDisplayRefs(alert)],
     ['createdBy', 'silenced.by'],
   )[0];
-  return plain as typeof alert;
+  return plain as typeof alert & AlertPageRefs;
 };
 
 export const deleteAlert = async (id: string, teamId: ObjectId) => {

@@ -10,6 +10,7 @@ import mongoose, { Types } from 'mongoose';
 
 import * as presetFilters from '@/db/repos/presetDashboardFilters';
 import * as users from '@/db/repos/users';
+import type { WebhookDoc } from '@/db/repos/webhooks';
 import {
   getLoggedInAgent,
   getServer,
@@ -18,8 +19,13 @@ import {
   makeTile,
 } from '@/fixtures';
 import Alert, { AlertSource } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import Webhook, { WebhookDocument, WebhookService } from '@/models/webhook';
+import { WebhookService } from '@/models/webhook';
+import {
+  createDashboardFixture,
+  findDashboardFixture,
+  setDashboardUpdatedByFixture,
+} from '@/test/sqliteMetadata';
+import { createWebhookFixture } from '@/test/sqliteMetadata';
 import {
   createSourceFixture,
   deleteSourceFixture,
@@ -43,7 +49,7 @@ describe('dashboard router', () => {
   let agent: Awaited<ReturnType<typeof getLoggedInAgent>>['agent'];
   let team: Awaited<ReturnType<typeof getLoggedInAgent>>['team'];
   let user: Awaited<ReturnType<typeof getLoggedInAgent>>['user'];
-  let webhook: WebhookDocument;
+  let webhook: WebhookDoc;
 
   beforeAll(async () => {
     await server.start();
@@ -54,7 +60,7 @@ describe('dashboard router', () => {
     agent = result.agent;
     team = result.team;
     user = result.user;
-    webhook = await Webhook.create({
+    webhook = await createWebhookFixture({
       name: 'Test Webhook',
       service: WebhookService.Slack,
       url: 'https://hooks.slack.com/test',
@@ -144,7 +150,7 @@ describe('dashboard router', () => {
   it('returns hue-named tokens on GET (list) for a Mongo-seeded legacy chart-N tile', async () => {
     const tileWithLegacy = makeTile();
     (tileWithLegacy.config as any).color = 'chart-1';
-    const seeded = await Dashboard.create({
+    const seeded = await createDashboardFixture({
       name: 'Pre-rename Dashboard',
       team: team._id,
       tiles: [tileWithLegacy],
@@ -184,9 +190,7 @@ describe('dashboard router', () => {
     });
 
     // Simulate a different user updating the dashboard
-    await Dashboard.findByIdAndUpdate(created.body.id, {
-      updatedBy: secondUser._id,
-    });
+    setDashboardUpdatedByFixture(created.body.id, secondUser._id);
 
     const allDashboards = await agent.get('/dashboards').expect(200);
     const dashboard = allDashboards.body.find(d => d._id === created.body.id);
@@ -792,7 +796,7 @@ describe('dashboard router', () => {
 
       expect(created.body.filters).toEqual([filter]);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([filter]);
     });
 
@@ -812,7 +816,7 @@ describe('dashboard router', () => {
         .send({ ...MOCK_DASHBOARD, filters: [filter] })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters?.[0]).not.toHaveProperty('isBroadcastEnabled');
       expect(stored?.filters?.[0]).not.toHaveProperty('isVariableEnabled');
       expect(stored?.filters?.[0]).not.toHaveProperty('variableName');
@@ -835,7 +839,7 @@ describe('dashboard router', () => {
         .send({ filters: [updatedFilter] })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([updatedFilter]);
     });
 
@@ -851,7 +855,7 @@ describe('dashboard router', () => {
         .send({ name: 'Renamed Dashboard' })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.name).toBe('Renamed Dashboard');
       expect(stored?.filters).toEqual([filter]);
     });
@@ -1072,7 +1076,7 @@ describe('dashboard router', () => {
           .expect(400);
 
         // The stored filter is untouched by the rejected PATCH.
-        const stored = await Dashboard.findById(created.body.id).lean();
+        const stored = await findDashboardFixture(created.body.id);
         expect(stored?.filters).toEqual([filter]);
       });
 
@@ -1115,7 +1119,7 @@ describe('dashboard router', () => {
           })
           .expect(200);
 
-        const stored = await Dashboard.findById(created.body.id).lean();
+        const stored = await findDashboardFixture(created.body.id);
         expect(stored?.filters?.[0]).not.toHaveProperty('isBroadcastEnabled');
       });
 
@@ -1168,7 +1172,7 @@ describe('dashboard router', () => {
 
       expect(created.body.filters).toEqual([filter]);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([filter]);
     });
 
@@ -1187,7 +1191,7 @@ describe('dashboard router', () => {
         .send({ filters: [filter] })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters?.[0].minSelections).toBe(1);
     });
 
@@ -1199,7 +1203,7 @@ describe('dashboard router', () => {
         .send({ ...MOCK_DASHBOARD, filters: [makeFilter()] })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters?.[0]).not.toHaveProperty('minSelections');
     });
 
@@ -1226,7 +1230,7 @@ describe('dashboard router', () => {
 
       expect(created.body.filters).toEqual([filter]);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([filter]);
     });
 
@@ -1241,7 +1245,7 @@ describe('dashboard router', () => {
         })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters?.[0]).not.toHaveProperty('isGlobalRequirement');
     });
 
@@ -1287,7 +1291,7 @@ describe('dashboard router', () => {
         )?.filters,
       ).toEqual([filter]);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([filter]);
       // The queried-filter fields have to stay absent, not be materialized as
       // null: `expression` falsiness is what makes `$__filter($env)` report
@@ -1324,7 +1328,7 @@ describe('dashboard router', () => {
         .send({ filters: [updatedFilter] })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([updatedFilter]);
     });
 
@@ -1393,7 +1397,7 @@ describe('dashboard router', () => {
 
       // Still reads back as a valid static filter, and template export drops
       // the stray keys (see `convertToDashboardTemplate` in common-utils).
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters?.[0]).toMatchObject({
         type: 'STATIC_LIST',
         options: ['prod', 'staging', 'dev'],
@@ -1414,7 +1418,7 @@ describe('dashboard router', () => {
         .send({ filters: [{ ...filter, options: [] }] })
         .expect(400);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([filter]);
     });
 
@@ -1487,7 +1491,7 @@ describe('dashboard router', () => {
 
       expect(created.body.filters).toEqual([filter]);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([filter]);
       // Same reason as the static variant: an absent `expression` is what makes
       // `$__filter($pod)` report that the expression must be passed explicitly.
@@ -1541,7 +1545,7 @@ describe('dashboard router', () => {
         .send({ filters: [updatedFilter] })
         .expect(200);
 
-      const stored = await Dashboard.findById(created.body.id).lean();
+      const stored = await findDashboardFixture(created.body.id);
       expect(stored?.filters).toEqual([updatedFilter]);
     });
 
@@ -1634,7 +1638,7 @@ describe('dashboard router', () => {
           })
           .expect(400);
 
-        const stored = await Dashboard.findById(created.body.id).lean();
+        const stored = await findDashboardFixture(created.body.id);
         expect(stored?.filters).toEqual([filter]);
       });
 
@@ -1656,7 +1660,7 @@ describe('dashboard router', () => {
           .send({ name: 'Renamed', filters: [filter] })
           .expect(200);
 
-        const stored = await Dashboard.findById(created.body.id).lean();
+        const stored = await findDashboardFixture(created.body.id);
         expect(stored?.name).toBe('Renamed');
         expect(stored?.filters).toEqual([filter]);
       });

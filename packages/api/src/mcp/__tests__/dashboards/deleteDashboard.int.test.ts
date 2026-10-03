@@ -1,5 +1,6 @@
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
-import Dashboard from '@/models/dashboard';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { findDashboardFixture } from '@/test/sqliteMetadata';
 
 import { setupDashboardTests } from './setup';
 
@@ -7,11 +8,11 @@ describe('MCP Dashboard Tools - clickstack_delete_dashboard', () => {
   const ctx = setupDashboardTests();
 
   it('should delete an existing dashboard', async () => {
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'To Delete',
       tiles: [],
       team: ctx.team._id,
-    }).save();
+    });
 
     const result = await callTool(ctx.client!, 'clickstack_delete_dashboard', {
       id: dashboard._id.toString(),
@@ -23,7 +24,7 @@ describe('MCP Dashboard Tools - clickstack_delete_dashboard', () => {
     expect(output.id).toBe(dashboard._id.toString());
 
     // Verify deleted from database
-    const found = await Dashboard.findById(dashboard._id);
+    const found = await findDashboardFixture(dashboard._id);
     expect(found).toBeNull();
   });
 

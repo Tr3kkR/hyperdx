@@ -8,7 +8,7 @@ import Handlebars from 'handlebars';
 import { performance } from 'perf_hooks';
 import { serializeError } from 'serialize-error';
 
-import { IWebhook } from '@/models/webhook';
+import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import {
   WebhookRedirectError,
   WebhookResponseError,
@@ -170,6 +170,13 @@ const toStringHeaderRecord = (value: unknown): Record<string, string> => {
   );
 };
 
+const webhookMapValues = (
+  value: Record<string, string> | { toJSON(): unknown } | undefined,
+): Record<string, string> =>
+  toStringHeaderRecord(
+    value && typeof value.toJSON === 'function' ? value.toJSON() : value,
+  );
+
 const sendGenericWebhook = async (
   webhook: IWebhook,
   message: Message,
@@ -183,7 +190,9 @@ const sendGenericWebhook = async (
     // user may have included params in both the url and the query params
     // so they should be merged
     const tmpURL = new URL(webhook.url);
-    for (const [key, value] of Object.entries(webhook.queryParams.toJSON())) {
+    for (const [key, value] of Object.entries(
+      webhookMapValues(webhook.queryParams),
+    )) {
       tmpURL.searchParams.append(key, value);
     }
 
@@ -199,7 +208,7 @@ const sendGenericWebhook = async (
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json', // default, will be overwritten if user has set otherwise
-    ...toStringHeaderRecord(webhook.headers?.toJSON()),
+    ...webhookMapValues(webhook.headers),
     // Stable per-alert key for receivers that honour Idempotency-Key; delivery is at-least-once.
     'Idempotency-Key': objectHash({
       eventId: message.eventId,

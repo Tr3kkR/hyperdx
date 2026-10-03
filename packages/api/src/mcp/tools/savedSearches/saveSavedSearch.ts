@@ -5,6 +5,7 @@ import {
   updateSavedSearch,
 } from '@/controllers/savedSearch';
 import { getSource } from '@/controllers/sources';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import {
   mcpServerError,
@@ -83,7 +84,7 @@ export function registerSaveSavedSearch({
               type: 'text' as const,
               text: JSON.stringify(
                 {
-                  ...updated.toExternalJSON(),
+                  ...savedSearchesRepo.toExternalJSON(updated),
                   ...(frontendUrl
                     ? { url: `${frontendUrl}/search/${updated._id}` }
                     : {}),
@@ -105,7 +106,7 @@ export function registerSaveSavedSearch({
             type: 'text' as const,
             text: JSON.stringify(
               {
-                ...created.toExternalJSON(),
+                ...savedSearchesRepo.toExternalJSON(created),
                 ...(frontendUrl
                   ? { url: `${frontendUrl}/search/${created._id}` }
                   : {}),

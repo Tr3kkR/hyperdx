@@ -5,15 +5,19 @@ import os from 'os';
 import path from 'path';
 
 import { createTeam } from '@/controllers/team';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as Team from '@/db/repos/teams';
 import { clearDBCollections, closeDB, connectDB, makeTile } from '@/fixtures';
-import Dashboard from '@/models/dashboard';
 import {
   readDashboardFiles,
   syncDashboards,
 } from '@/tasks/provisionDashboards';
 import ProvisionDashboardsTask from '@/tasks/provisionDashboards';
 import { TaskName } from '@/tasks/types';
+import {
+  countAllDashboardFixtures,
+  createDashboardFixture,
+} from '@/test/sqliteMetadata';
 
 describe('provisionDashboards', () => {
   let tmpDir: string;
@@ -183,20 +187,20 @@ describe('provisionDashboards', () => {
 
       await syncDashboards(team._id.toString(), tmpDir);
 
-      const count = await Dashboard.countDocuments({ team: team._id });
+      const count = dashboardsRepo.count(String(team._id));
       expect(count).toBe(1);
     });
 
     it('updates an existing dashboard by name', async () => {
       const team = await createTeam({ name: 'My Team' });
       const tile = makeTile();
-      await new Dashboard({
+      createDashboardFixture({
         name: 'Existing',
         tiles: [tile],
         tags: [],
         team: team._id,
         provisioned: true,
-      }).save();
+      });
 
       const newTile = makeTile();
       fs.writeFileSync(
@@ -210,10 +214,9 @@ describe('provisionDashboards', () => {
 
       await syncDashboards(team._id.toString(), tmpDir);
 
-      const dashboard = (await Dashboard.findOne({
-        name: 'Existing',
-        team: team._id,
-      })) as any;
+      const dashboard = dashboardsRepo
+        .list(String(team._id))
+        .find(d => d.name === 'Existing')!;
       expect(dashboard.tiles[0].id).toBe(newTile.id);
       expect(dashboard.tags).toEqual(['updated']);
     });
@@ -229,7 +232,7 @@ describe('provisionDashboards', () => {
       await syncDashboards(team._id.toString(), tmpDir);
       await syncDashboards(team._id.toString(), tmpDir);
 
-      const count = await Dashboard.countDocuments({ team: team._id });
+      const count = dashboardsRepo.count(String(team._id));
       expect(count).toBe(1);
     });
 
@@ -248,8 +251,8 @@ describe('provisionDashboards', () => {
       await syncDashboards(teamA._id.toString(), tmpDir);
       await syncDashboards(teamB._id.toString(), tmpDir);
 
-      expect(await Dashboard.countDocuments({ team: teamA._id })).toBe(1);
-      expect(await Dashboard.countDocuments({ team: teamB._id })).toBe(1);
+      expect(dashboardsRepo.count(String(teamA._id))).toBe(1);
+      expect(dashboardsRepo.count(String(teamB._id))).toBe(1);
     });
 
     it('does not delete dashboard when file is removed', async () => {
@@ -265,25 +268,25 @@ describe('provisionDashboards', () => {
       );
 
       await syncDashboards(team._id.toString(), tmpDir);
-      expect(await Dashboard.countDocuments({ team: team._id })).toBe(1);
+      expect(dashboardsRepo.count(String(team._id))).toBe(1);
 
       // Remove the file and sync again
       fs.unlinkSync(filePath);
       await syncDashboards(team._id.toString(), tmpDir);
 
       // Dashboard should still exist
-      expect(await Dashboard.countDocuments({ team: team._id })).toBe(1);
+      expect(dashboardsRepo.count(String(team._id))).toBe(1);
     });
 
     it('does not overwrite user-created dashboards', async () => {
       const team = await createTeam({ name: 'My Team' });
       const userTile = makeTile();
-      await new Dashboard({
+      createDashboardFixture({
         name: 'My Dashboard',
         tiles: [userTile],
         tags: ['user-tag'],
         team: team._id,
-      }).save();
+      });
 
       fs.writeFileSync(
         path.join(tmpDir, 'my-dashboard.json'),
@@ -296,20 +299,16 @@ describe('provisionDashboards', () => {
 
       await syncDashboards(team._id.toString(), tmpDir);
 
-      const userDashboard = (await Dashboard.findOne({
-        name: 'My Dashboard',
-        team: team._id,
-        provisioned: { $ne: true },
-      })) as any;
+      const userDashboard = dashboardsRepo
+        .list(String(team._id))
+        .find(d => d.name === 'My Dashboard' && !d.provisioned)!;
       expect(userDashboard).toBeTruthy();
       expect(userDashboard.tiles[0].id).toBe(userTile.id);
       expect(userDashboard.tags).toEqual(['user-tag']);
 
-      const provisionedDashboard = await Dashboard.findOne({
-        name: 'My Dashboard',
-        team: team._id,
-        provisioned: true,
-      });
+      const provisionedDashboard = dashboardsRepo
+        .list(String(team._id))
+        .find(d => d.name === 'My Dashboard' && d.provisioned);
       expect(provisionedDashboard).toBeTruthy();
     });
   });
@@ -374,7 +373,7 @@ describe('provisionDashboards', () => {
       });
       await task.execute();
 
-      expect(await Dashboard.countDocuments({})).toBe(0);
+      expect(countAllDashboardFixtures()).toBe(0);
     });
 
     it('provisions dashboards for all teams', async () => {
@@ -395,7 +394,7 @@ describe('provisionDashboards', () => {
       });
       await task.execute();
 
-      expect(await Dashboard.countDocuments({ team: team._id })).toBe(1);
+      expect(dashboardsRepo.count(String(team._id))).toBe(1);
     });
 
     it('provisions dashboards for a specific team', async () => {
@@ -416,7 +415,7 @@ describe('provisionDashboards', () => {
       });
       await task.execute();
 
-      expect(await Dashboard.countDocuments({ team: team._id })).toBe(1);
+      expect(dashboardsRepo.count(String(team._id))).toBe(1);
     });
   });
 });

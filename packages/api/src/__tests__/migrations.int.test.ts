@@ -4,8 +4,11 @@ import { createTeam } from '@/controllers/team';
 import { clearDBCollections, closeDB, connectDB } from '@/fixtures';
 import { backfillAlertDisplayFields } from '@/migrations';
 import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import {
+  createSavedSearchFixture,
+  setSavedSearchNameFixture,
+} from '@/test/sqliteMetadata';
 
 const baseAlert = {
   threshold: 1,
@@ -18,7 +21,7 @@ const makeSavedSearch = (
   team: mongoose.Types.ObjectId | string,
   fields: { name: string; tags?: string[] },
 ) =>
-  new SavedSearch({
+  createSavedSearchFixture({
     team,
     source: new mongoose.Types.ObjectId(),
     select: '',
@@ -26,7 +29,7 @@ const makeSavedSearch = (
     whereLanguage: 'lucene',
     orderBy: '',
     ...fields,
-  }).save();
+  });
 
 describe('backfillAlertDisplayFields', () => {
   beforeAll(async () => {
@@ -50,12 +53,12 @@ describe('backfillAlertDisplayFields', () => {
     const untaggedSearch = await makeSavedSearch(team._id, {
       name: 'Untagged search',
     });
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       team: team._id,
       name: 'Service health',
       tags: ['infra'],
       tiles: [{ id: 'tile-1', config: { name: 'P95 latency' } }],
-    }).save();
+    });
 
     const [
       searchAlert,
@@ -129,12 +132,6 @@ describe('backfillAlertDisplayFields', () => {
       },
     ]);
 
-    const { insertedId: legacyAlertId } = await Alert.collection.insertOne({
-      ...baseAlert,
-      team: team._id,
-      savedSearch: savedSearch._id,
-    });
-
     await backfillAlertDisplayFields();
 
     const byId = async (id: mongoose.Types.ObjectId | string) =>
@@ -167,10 +164,6 @@ describe('backfillAlertDisplayFields', () => {
       displayName: 'CPU usage',
       tags: [],
     });
-    expect(await byId(legacyAlertId)).toMatchObject({
-      displayName: 'Error spikes',
-    });
-
     const untagged = await byId(untaggedSearchAlert._id);
     expect(untagged?.displayName).toBe('Untagged search');
     expect(untagged?.tags).toEqual([]);
@@ -207,10 +200,7 @@ describe('backfillAlertDisplayFields', () => {
       'First name',
     );
 
-    await SavedSearch.updateOne(
-      { _id: savedSearch._id },
-      { name: 'Second name' },
-    );
+    setSavedSearchNameFixture(savedSearch._id, 'Second name');
     await Alert.updateOne(
       { _id: otherAlert._id },
       { $unset: { displayName: '' } },

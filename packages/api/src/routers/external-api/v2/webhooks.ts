@@ -6,8 +6,8 @@ import {
   deleteWebhook,
   updateWebhook,
 } from '@/controllers/webhook';
-import { WebhookDocument } from '@/models/webhook';
-import Webhook from '@/models/webhook';
+import type { WebhookDoc } from '@/db/repos/webhooks';
+import * as webhooksRepo from '@/db/repos/webhooks';
 import { processRequestWithEnhancedErrors as validateRequest } from '@/utils/enhancedErrors';
 import { isDuplicateKeyError } from '@/utils/errors';
 import { getCounter } from '@/utils/instrumentation';
@@ -56,7 +56,7 @@ const webhookSerializationErrorCounter = getCounter(
 // reconcile rather than assuming the create/update failed.
 function respondPersistedButUnserializable(
   res: express.Response,
-  webhook: WebhookDocument,
+  webhook: WebhookDoc,
 ) {
   logger.error({
     message:
@@ -72,13 +72,14 @@ function respondPersistedButUnserializable(
 }
 
 function formatExternalWebhook(
-  webhook: WebhookDocument,
+  webhook: WebhookDoc,
 ): ExternalWebhook | undefined {
-  // Convert to JSON so that any ObjectIds are converted to strings ("_id" is also converted to "id")
-  const json = JSON.stringify(webhook.toJSON({ getters: true }));
-
   // Parse using the externalWebhookSchema to strip out any fields not defined in the schema
-  const parseResult = externalWebhookSchema.safeParse(JSON.parse(json));
+  const parseResult = externalWebhookSchema.safeParse({
+    ...webhook,
+    createdAt: webhook.createdAt.toISOString(),
+    updatedAt: webhook.updatedAt.toISOString(),
+  });
   if (parseResult.success) {
     return parseResult.data;
   }
@@ -337,12 +338,8 @@ router.get(
       }
 
       const { limit, offset } = getPagination(req.query);
-      const filter = { team: teamId.toString() };
-      // Sort by _id so skip/offset paging is stable across requests.
-      const [webhooks, total] = await Promise.all([
-        Webhook.find(filter).sort({ _id: 1 }).skip(offset).limit(limit),
-        Webhook.countDocuments(filter),
-      ]);
+      const webhooks = webhooksRepo.page(teamId.toString(), limit, offset);
+      const total = webhooksRepo.count(teamId.toString());
 
       // Surface the full count at the HTTP layer too, so a client that reads
       // headers but not the `meta` body can still detect truncation.

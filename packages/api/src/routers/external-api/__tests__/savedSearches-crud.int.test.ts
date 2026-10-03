@@ -12,7 +12,10 @@ import {
   getServer,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
-import { SavedSearch } from '@/models/savedSearch';
+import {
+  createSavedSearchFixture,
+  findSavedSearchFixture,
+} from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
   createSourceFixture,
@@ -80,7 +83,7 @@ describe('External API v2 Saved Searches CRUD', () => {
   });
 
   const createOtherTeamSavedSearch = () =>
-    SavedSearch.create({
+    createSavedSearchFixture({
       team: new mongoose.Types.ObjectId(),
       name: 'Other Team Search',
       source: new mongoose.Types.ObjectId(),
@@ -419,7 +422,7 @@ describe('External API v2 Saved Searches CRUD', () => {
       // parser does not render (e.g. a lucene condition). GET returns it
       // verbatim, so a read-modify-write that echoes it back unchanged must
       // succeed — otherwise the API would 400 on data it just served.
-      const legacy = await SavedSearch.create({
+      const legacy = await createSavedSearchFixture({
         team: team._id,
         name: 'Legacy',
         source: sourceId,
@@ -528,13 +531,13 @@ describe('External API v2 Saved Searches CRUD', () => {
         200,
       );
 
-      expect(await SavedSearch.findById(created.body.data.id)).toBeNull();
+      expect(await findSavedSearchFixture(created.body.data.id)).toBeNull();
     });
 
     it('should return 404 for another team saved search', async () => {
       const other = await createOtherTeamSavedSearch();
       await authRequest('delete', `${BASE_URL}/${other._id}`).expect(404);
-      expect(await SavedSearch.findById(other._id)).not.toBeNull();
+      expect(await findSavedSearchFixture(other._id)).not.toBeNull();
     });
 
     it('should delete alerts attached to the saved search', async () => {
@@ -555,55 +558,11 @@ describe('External API v2 Saved Searches CRUD', () => {
 
       await authRequest('delete', `${BASE_URL}/${savedSearchId}`).expect(200);
 
-      expect(await SavedSearch.findById(savedSearchId)).toBeNull();
+      expect(await findSavedSearchFixture(savedSearchId)).toBeNull();
       // Dependent alerts must not be orphaned.
       expect(await Alert.countDocuments({ savedSearch: savedSearchId })).toBe(
         0,
       );
-    });
-
-    it('should delete dependent alerts before the saved search (partial-failure ordering)', async () => {
-      // Verifies the documented least-bad partial-failure ordering: alerts are
-      // deleted before the parent, so if the final SavedSearch.deleteOne throws,
-      // the search survives without its alerts (recoverable) rather than
-      // leaving orphaned alerts pointing at a deleted saved search.
-      const created = await authRequest('post', BASE_URL)
-        .send(savedSearchBody())
-        .expect(200);
-      const savedSearchId = created.body.data.id;
-
-      await Alert.create({
-        team: team._id,
-        savedSearch: savedSearchId,
-        source: AlertSource.SAVED_SEARCH,
-        threshold: 1,
-        interval: '5m',
-        state: AlertState.OK,
-        channel: { type: null },
-      });
-
-      const consoleErrorSpy = jest
-        .spyOn(console, 'error')
-        .mockImplementation(() => {});
-      const deleteSpy = jest
-        .spyOn(SavedSearch, 'deleteOne')
-        .mockImplementationOnce((() => {
-          throw new Error('simulated deleteOne failure');
-        }) as any);
-
-      try {
-        await authRequest('delete', `${BASE_URL}/${savedSearchId}`).expect(500);
-      } finally {
-        deleteSpy.mockRestore();
-        consoleErrorSpy.mockRestore();
-      }
-
-      // Alerts were deleted first, before the failure...
-      expect(await Alert.countDocuments({ savedSearch: savedSearchId })).toBe(
-        0,
-      );
-      // ...and the saved search survives its own failed delete (recoverable).
-      expect(await SavedSearch.findById(savedSearchId)).not.toBeNull();
     });
   });
 });

@@ -6,11 +6,10 @@ import { z } from 'zod';
 import * as config from '@/config';
 import { getRecentAlertHistories } from '@/controllers/alertHistory';
 import { getAlertById } from '@/controllers/alerts';
+import { withDisplayRefs } from '@/controllers/alerts';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpUserError, validateObjectId } from '@/mcp/utils/errors';
 import Alert from '@/models/alert';
-import type { IDashboard } from '@/models/dashboard';
-import type { ISavedSearch } from '@/models/savedSearch';
 import { translateAlertDocumentToExternalAlertWithChartConfig } from '@/routers/external-api/v2/utils/alertChartConfig';
 import { resolveAlertDisplayFields } from '@/utils/alerts';
 
@@ -58,15 +57,22 @@ export function registerGetAlert({
         if (state) {
           query.state = state;
         }
-        const alerts = await Alert.find(query).populate<{
-          savedSearch: ISavedSearch | null;
-          dashboard: IDashboard | null;
-        }>(['savedSearch', 'dashboard']);
+        const alerts = (await Alert.find(query)).map(withDisplayRefs);
 
         const output = alerts.map(alert => {
           const { displayName, tags } = resolveAlertDisplayFields(alert, {
-            savedSearch: alert.savedSearch,
-            dashboard: alert.dashboard,
+            savedSearch:
+              alert.savedSearch &&
+              typeof alert.savedSearch === 'object' &&
+              'name' in alert.savedSearch
+                ? alert.savedSearch
+                : null,
+            dashboard:
+              alert.dashboard &&
+              typeof alert.dashboard === 'object' &&
+              'name' in alert.dashboard
+                ? alert.dashboard
+                : null,
           });
           return {
             id: alert._id.toString(),
@@ -97,10 +103,7 @@ export function registerGetAlert({
 
       // Populate the refs the display name/tags derive from, so alerts written
       // before those fields existed still resolve to something meaningful.
-      const populated = await alert.populate<{
-        savedSearch: ISavedSearch | null;
-        dashboard: IDashboard | null;
-      }>(['savedSearch', 'dashboard']);
+      const populated = withDisplayRefs(alert);
 
       const external =
         translateAlertDocumentToExternalAlertWithChartConfig(populated);

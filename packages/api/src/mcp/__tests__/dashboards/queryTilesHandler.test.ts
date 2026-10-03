@@ -1,5 +1,5 @@
 // Unit test for the clickstack_query_tiles handler's per-tile failure
-// isolation. Mocks the heavy collaborators (Mongo model, dashboard
+// isolation. Mocks the heavy collaborators (SQLite repository, dashboard
 // conversion, ClickHouse-backed runConfigTile) so we can drive the batch loop
 // deterministically without any live services, then assert that a hanging /
 // throwing tile becomes a status:'error' entry while the rest of the batch
@@ -17,9 +17,8 @@ jest.mock('@/mcp/tools/query/helpers', () => {
   };
 });
 
-jest.mock('@/models/dashboard', () => ({
-  __esModule: true,
-  default: { findOne: (...args: unknown[]) => mockFindOne(...args) },
+jest.mock('@/db/repos/dashboards', () => ({
+  findById: (...args: unknown[]) => mockFindOne(...args),
 }));
 
 jest.mock('@/routers/external-api/v2/utils/dashboards', () => {
@@ -81,7 +80,7 @@ const tile = (id: string, name: string) => ({
 
 beforeEach(() => {
   jest.clearAllMocks();
-  mockFindOne.mockResolvedValue({ _id: 'dash-1' });
+  mockFindOne.mockReturnValue({ _id: 'dash-1' });
 });
 
 describe('clickstack_query_tiles handler — per-tile failure isolation', () => {

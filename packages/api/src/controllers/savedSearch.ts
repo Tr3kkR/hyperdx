@@ -6,9 +6,9 @@ import { groupBy } from 'lodash';
 import { z } from 'zod';
 
 import { deleteSavedSearchAlerts } from '@/controllers/alerts';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import { hydrateUsers } from '@/db/repos/users';
 import Alert from '@/models/alert';
-import { SavedSearch } from '@/models/savedSearch';
 import { resolveAlertDisplayFields } from '@/utils/alerts';
 import logger from '@/utils/logger';
 
@@ -17,7 +17,7 @@ type SavedSearchWithoutId = Omit<z.infer<typeof SavedSearchSchema>, 'id'>;
 export async function getSavedSearches(
   teamId: string,
 ): Promise<SavedSearchListApiResponse[]> {
-  const savedSearches = await SavedSearch.find({ team: teamId });
+  const savedSearches = savedSearchesRepo.list(teamId);
   const alerts = await Alert.find(
     { team: teamId, savedSearch: { $exists: true, $ne: null } },
     { __v: 0 },
@@ -26,7 +26,7 @@ export async function getSavedSearches(
   const alertsBySavedSearchId = groupBy(alerts, 'savedSearch');
 
   const result = savedSearches.map(savedSearch => ({
-    ...hydrateUsers([savedSearch.toJSON()], ['createdBy', 'updatedBy'])[0],
+    ...hydrateUsers([savedSearch], ['createdBy', 'updatedBy'])[0],
     alerts: alertsBySavedSearchId[savedSearch._id.toString()]?.map(alert => ({
       ...hydrateUsers([alert.toJSON()], ['createdBy'])[0],
       ...resolveAlertDisplayFields(alert, { savedSearch }),
@@ -38,15 +38,9 @@ export async function getSavedSearches(
 }
 
 export async function getSavedSearch(teamId: string, savedSearchId: string) {
-  const doc = await SavedSearch.findOne({ _id: savedSearchId, team: teamId });
+  const doc = savedSearchesRepo.findById(savedSearchId, teamId);
   if (!doc) return null;
-  const originalToJSON = doc.toJSON.bind(doc);
-  doc.toJSON = ((...args: Parameters<typeof doc.toJSON>) =>
-    hydrateUsers(
-      [originalToJSON(...args)],
-      ['createdBy', 'updatedBy'],
-    )[0]) as typeof doc.toJSON;
-  return doc;
+  return hydrateUsers([doc], ['createdBy', 'updatedBy'])[0];
 }
 
 export function createSavedSearch(
@@ -54,12 +48,7 @@ export function createSavedSearch(
   savedSearch: SavedSearchWithoutId,
   userId?: string,
 ) {
-  return SavedSearch.create({
-    ...savedSearch,
-    team: teamId,
-    createdBy: userId,
-    updatedBy: userId,
-  });
+  return savedSearchesRepo.create(teamId, savedSearch, userId);
 }
 
 export function updateSavedSearch(
@@ -68,22 +57,11 @@ export function updateSavedSearch(
   savedSearch: SavedSearchWithoutId,
   userId?: string,
 ) {
-  return SavedSearch.findOneAndUpdate(
-    { _id: savedSearchId, team: teamId },
-    {
-      ...savedSearch,
-      team: teamId,
-      updatedBy: userId,
-    },
-    { new: true },
-  );
+  return savedSearchesRepo.update(savedSearchId, teamId, savedSearch, userId);
 }
 
 export async function deleteSavedSearch(teamId: string, savedSearchId: string) {
-  const savedSearch = await SavedSearch.findOne({
-    _id: savedSearchId,
-    team: teamId,
-  });
+  const savedSearch = savedSearchesRepo.findById(savedSearchId, teamId);
   if (savedSearch == null) {
     return null;
   }
@@ -95,7 +73,7 @@ export async function deleteSavedSearch(teamId: string, savedSearchId: string) {
   // recoverable by re-creating alerts, and strictly better than the reverse
   // order's failure mode (orphaned alerts pointing at a deleted saved search).
   await deleteSavedSearchAlerts(savedSearchId, teamId);
-  await SavedSearch.deleteOne({ _id: savedSearchId, team: teamId });
+  savedSearchesRepo.remove(savedSearchId, teamId);
   // Re-sweep after the parent is gone: a concurrent alert-create targeting this
   // saved search could land between the two deletes above and orphan itself.
   // Once the parent no longer exists this second sweep cleans up any such alert

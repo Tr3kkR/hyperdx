@@ -8,12 +8,12 @@ import express from 'express';
 import type { Query } from 'mongoose';
 
 import * as connectionsRepo from '@/db/repos/connections';
+import * as dashboardsRepo from '@/db/repos/dashboards';
+import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import * as sourcesRepo from '@/db/repos/sources';
+import * as webhooksRepo from '@/db/repos/webhooks';
 import { getNonNullUserWithTeam } from '@/middleware/auth';
 import Alert from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook from '@/models/webhook';
 import { unaddressableTileAlertIds } from '@/utils/iacTileAlerts';
 import { getCounter, withSpan } from '@/utils/instrumentation';
 
@@ -121,16 +121,13 @@ router.get('/import-manifest', async (req, res, next) => {
         // the configs — but SQL templates, select lists and filters have no
         // business leaving Mongo for a boolean. Keep this projection in step
         // with what that predicate inspects.
-        bounded(
-          Dashboard.find(
-            { team: teamId, provisioned: { $ne: true } },
-            {
-              name: 1,
-              'tiles.config.configType': 1,
-              'tiles.config.displayType': 1,
-            },
-          ),
-        ).lean(),
+        Promise.resolve(
+          dashboardsRepo
+            .list(String(teamId))
+            .filter(d => !d.provisioned)
+            .slice(0, IAC_MANIFEST_LIMIT + 1)
+            .map(({ _id, name, tiles }) => ({ _id, name, tiles })),
+        ),
         bounded(
           Alert.find(
             { team: teamId },
@@ -139,7 +136,12 @@ router.get('/import-manifest', async (req, res, next) => {
             { name: 1, source: 1, savedSearch: 1, dashboard: 1, tileId: 1 },
           ),
         ).lean(),
-        bounded(SavedSearch.find({ team: teamId }, { name: 1 })).lean(),
+        Promise.resolve(
+          savedSearchesRepo
+            .list(String(teamId))
+            .slice(0, IAC_MANIFEST_LIMIT + 1)
+            .map(({ _id, name }) => ({ _id, name })),
+        ),
         Promise.resolve(
           sourcesRepo
             .list(String(teamId))
@@ -158,7 +160,12 @@ router.get('/import-manifest', async (req, res, next) => {
               platformProvisioned,
             })),
         ),
-        bounded(Webhook.find({ team: teamId }, { name: 1 })).lean(),
+        Promise.resolve(
+          webhooksRepo
+            .list(String(teamId))
+            .slice(0, IAC_MANIFEST_LIMIT + 1)
+            .map(({ _id, name }) => ({ _id, name })),
+        ),
       ]);
 
       const dashboards = capListing(dashboardRows);

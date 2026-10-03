@@ -162,7 +162,7 @@ router.post(
 
       const newDashboard = await createDashboard(teamId, dashboard, userId);
 
-      res.json(newDashboard.toJSON());
+      res.json(newDashboard);
     } catch (e) {
       next(e);
     }

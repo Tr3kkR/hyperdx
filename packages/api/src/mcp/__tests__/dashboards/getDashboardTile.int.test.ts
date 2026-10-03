@@ -1,5 +1,5 @@
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
-import Dashboard from '@/models/dashboard';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
 
 import { setupDashboardTests } from './setup';
 
@@ -54,11 +54,11 @@ describe('MCP Dashboard Tools - clickstack_get_dashboard_tile', () => {
   });
 
   it('should return error for non-existent tileId', async () => {
-    const dashboard = await new Dashboard({
+    const dashboard = createDashboardFixture({
       name: 'Empty Dashboard',
       tiles: [],
       team: ctx.team._id,
-    }).save();
+    });
 
     const result = await callTool(
       ctx.client!,

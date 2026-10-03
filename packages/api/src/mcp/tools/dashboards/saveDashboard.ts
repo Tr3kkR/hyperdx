@@ -5,9 +5,10 @@ import { z } from 'zod';
 
 import * as config from '@/config';
 import { recordDashboardOnboardingIfHasTiles } from '@/controllers/dashboard';
+import type { DashboardInput } from '@/db/repos/dashboards';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { formatZodIssues, mcpUserError } from '@/mcp/utils/errors';
-import Dashboard, { IDashboard } from '@/models/dashboard';
 import {
   cleanupDashboardAlerts,
   convertExternalFiltersToInternal,
@@ -199,16 +200,15 @@ async function createDashboard({
     savedQueryLanguage: undefined,
   });
 
-  const newDashboard = await new Dashboard({
+  const newDashboard = dashboardsRepo.create(teamId, {
     name: parsed.data.name,
     tiles: internalTiles,
-    tags: tags && uniq(tags),
+    tags: tags ? uniq(tags) : [],
     filters: filtersWithIds,
     savedQueryLanguage: normalizedSavedQueryLanguage,
     savedFilterValues: parsed.data.savedFilterValues,
-    team: teamId,
     ...(parsedContainers !== undefined ? { containers: parsedContainers } : {}),
-  }).save();
+  });
 
   recordDashboardOnboardingIfHasTiles(userId, newDashboard.tiles);
 
@@ -279,10 +279,7 @@ async function updateDashboard({
     return mcpUserError(sqlFilterSourceError);
   }
 
-  const existingDashboard = await Dashboard.findOne(
-    { _id: dashboardId, team: teamId },
-    { tiles: 1, filters: 1, containers: 1 },
-  ).lean();
+  const existingDashboard = dashboardsRepo.findById(dashboardId, teamId);
 
   if (!existingDashboard) {
     return mcpUserError('Dashboard not found');
@@ -325,11 +322,11 @@ async function updateDashboard({
     existingTileIds,
   );
 
-  // Typed as `Partial<IDashboard>` (the canonical Mongo doc shape) so
+  // Typed as dashboard fields so
   // misnamed or wrong-shape fields fail at compile time, mirroring the
   // v2 PUT handler's tightening at
   // `routers/external-api/v2/dashboards.ts:2015`.
-  const setPayload: Partial<IDashboard> = {
+  const setPayload: Partial<DashboardInput> = {
     name,
     tiles: internalTiles,
     tags: tags && uniq(tags),
@@ -358,10 +355,10 @@ async function updateDashboard({
     setPayload.containers = parsedContainers;
   }
 
-  const updatedDashboard = await Dashboard.findOneAndUpdate(
-    { _id: dashboardId, team: teamId },
-    { $set: setPayload },
-    { new: true },
+  const updatedDashboard = dashboardsRepo.update(
+    dashboardId,
+    teamId,
+    setPayload,
   );
 
   if (!updatedDashboard) {

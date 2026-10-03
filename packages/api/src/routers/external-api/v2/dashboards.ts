@@ -6,7 +6,8 @@ import {
   deleteDashboard,
   recordDashboardOnboardingIfHasTiles,
 } from '@/controllers/dashboard';
-import Dashboard, { IDashboard } from '@/models/dashboard';
+import type { DashboardInput } from '@/db/repos/dashboards';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import { processRequestWithEnhancedErrors as validateRequest } from '@/utils/enhancedErrors';
 import { ExternalDashboardTileWithId, objectIdSchema } from '@/utils/zod';
 
@@ -20,23 +21,6 @@ import {
   updateDashboardBodySchema,
   validateDashboardTiles,
 } from './utils/dashboards';
-
-/**
- * Projection used by the GET-list and GET-by-id Dashboard endpoints, kept in
- * one place so adding a new field doesn't need touching both call sites.
- * Mirrors the shape consumed by `convertToExternalDashboard`.
- */
-const EXTERNAL_DASHBOARD_PROJECTION = {
-  _id: 1,
-  name: 1,
-  tiles: 1,
-  tags: 1,
-  filters: 1,
-  savedQuery: 1,
-  savedQueryLanguage: 1,
-  savedFilterValues: 1,
-  containers: 1,
-} as const;
 
 /**
  * @openapi
@@ -2345,10 +2329,9 @@ router.get('/', async (req, res, next) => {
       return res.sendStatus(403);
     }
 
-    const dashboards = await Dashboard.find(
-      { team: teamId },
-      EXTERNAL_DASHBOARD_PROJECTION,
-    ).sort({ name: -1 });
+    const dashboards = dashboardsRepo
+      .list(String(teamId))
+      .sort((a, b) => b.name.localeCompare(a.name));
 
     res.json({
       data: dashboards.map(d => convertToExternalDashboard(d)),
@@ -2453,10 +2436,7 @@ router.get(
         return res.sendStatus(403);
       }
 
-      const dashboard = await Dashboard.findOne(
-        { team: teamId, _id: req.params.id },
-        EXTERNAL_DASHBOARD_PROJECTION,
-      );
+      const dashboard = dashboardsRepo.findById(req.params.id, String(teamId));
 
       if (dashboard == null) {
         return res.sendStatus(404);
@@ -2770,7 +2750,7 @@ router.post(
         savedQueryLanguage,
       });
 
-      const newDashboard = await new Dashboard({
+      const newDashboard = dashboardsRepo.create(String(teamId), {
         name,
         tiles: internalTiles,
         tags: tags && uniq(tags),
@@ -2778,9 +2758,8 @@ router.post(
         savedQuery,
         savedQueryLanguage: normalizedSavedQueryLanguage,
         savedFilterValues,
-        team: teamId,
         ...(containers !== undefined ? { containers } : {}),
-      }).save();
+      });
 
       recordDashboardOnboardingIfHasTiles(req.user?._id, newDashboard.tiles);
 
@@ -2968,10 +2947,10 @@ router.put(
         containers,
       } = req.body ?? {};
 
-      const existingDashboard = await Dashboard.findOne(
-        { _id: dashboardId, team: teamId },
-        { tiles: 1, filters: 1, containers: 1 },
-      ).lean();
+      const existingDashboard = dashboardsRepo.findById(
+        dashboardId,
+        String(teamId),
+      );
 
       if (existingDashboard == null) {
         return res.sendStatus(404);
@@ -3002,10 +2981,10 @@ router.put(
         existingTileIds,
       );
 
-      // Typed as `Partial<IDashboard>` (the canonical Mongo doc shape) so
+      // Typed as dashboard fields so
       // that misnamed or wrong-shape fields fail at compile time. The
       // legacy `Record<string, unknown>` accepted anything.
-      const setPayload: Partial<IDashboard> = {
+      const setPayload: Partial<DashboardInput> = {
         name,
         tiles: internalTiles,
         tags: tags && uniq(tags),
@@ -3033,10 +3012,10 @@ router.put(
         setPayload.containers = containers;
       }
 
-      const updatedDashboard = await Dashboard.findOneAndUpdate(
-        { _id: dashboardId, team: teamId },
-        { $set: setPayload },
-        { new: true },
+      const updatedDashboard = dashboardsRepo.update(
+        dashboardId,
+        String(teamId),
+        setPayload,
       );
 
       if (updatedDashboard == null) {

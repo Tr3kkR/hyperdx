@@ -4,6 +4,8 @@ import mongoose from 'mongoose';
 import { DEFAULT_DATABASE } from '@/fixtures';
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
 import Dashboard from '@/models/dashboard';
+import { createDashboardFixture } from '@/test/sqliteMetadata';
+import { findDashboardFixture } from '@/test/sqliteMetadata';
 import { createSourceFixture } from '@/test/sqliteMetadata';
 import type { ExternalDashboardTileWithId } from '@/utils/zod';
 
@@ -43,7 +45,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       expect(output.tags).toEqual(['mcp-test']);
 
       // Verify in database
-      const dashboard = await Dashboard.findById(output.id);
+      const dashboard = await findDashboardFixture(output.id);
       expect(dashboard).not.toBeNull();
       expect(dashboard?.name).toBe('New MCP Dashboard');
     });
@@ -301,7 +303,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       // sourceId must round-trip so the $__filters macro can resolve.
       expect(output.tiles[0].config.sourceId).toBe(sourceId);
 
-      const dashboard = await Dashboard.findById(output.id);
+      const dashboard = await findDashboardFixture(output.id);
       expect(dashboard?.tiles?.[0]?.config?.source?.toString()).toBe(sourceId);
     });
 
@@ -1292,7 +1294,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       const output = JSON.parse(getFirstText(result));
       expect(output.id).toBeDefined();
       expect(output.tiles).toHaveLength(1);
-      const dashboard = await Dashboard.findById(output.id);
+      const dashboard = await findDashboardFixture(output.id);
       expect(dashboard).not.toBeNull();
 
       // The advisory names the tile and recommends the missing macros.
@@ -3085,11 +3087,11 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       const sourceId = ctx.traceSource._id.toString();
       // Create the target dashboard the onClick will link to so the
       // server-side `getMissingOnClickDashboards` check resolves.
-      const targetDashboard = await new Dashboard({
+      const targetDashboard = createDashboardFixture({
         name: 'Service Detail',
         tiles: [],
         team: ctx.team._id,
-      }).save();
+      });
 
       const result = await callTool(ctx.client!, 'clickstack_save_dashboard', {
         name: 'OnClick dashboard by id',
@@ -3564,7 +3566,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
         expect(result.isError).toBeFalsy();
         const output = JSON.parse(getFirstText(result));
 
-        const stored = await Dashboard.findById(output.id);
+        const stored = await findDashboardFixture(output.id);
         expect(stored!.tiles[0].config).toMatchObject({
           select: [{ isDelta: true }],
         });

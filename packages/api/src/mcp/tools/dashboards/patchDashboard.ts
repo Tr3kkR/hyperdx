@@ -2,9 +2,10 @@ import { uniq } from 'lodash';
 
 import * as config from '@/config';
 import { recordDashboardOnboardingIfHasTiles } from '@/controllers/dashboard';
+import type { DashboardInput } from '@/db/repos/dashboards';
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpUserError } from '@/mcp/utils/errors';
-import Dashboard from '@/models/dashboard';
 import {
   cleanupDashboardAlerts,
   convertToExternalDashboard,
@@ -61,22 +62,13 @@ export function registerPatchDashboard({
         );
       }
 
-      const existingDashboard = await Dashboard.findOne({
-        _id: dashboardId,
-        team: teamId,
-      });
+      const existingDashboard = dashboardsRepo.findById(dashboardId, teamId);
       if (!existingDashboard) {
         return mcpUserError('Dashboard not found');
       }
 
-      // Build the $set payload and the query filter. Metadata fields
-      // are simple top-level $set entries; the tile patch uses the
-      // positional $ operator matched by 'tiles.id' in the filter.
-      const setPayload: Record<string, unknown> = {};
-      const queryFilter: Record<string, unknown> = {
-        _id: dashboardId,
-        team: teamId,
-      };
+      const setPayload: Partial<DashboardInput> = {};
+      let internalTile: DashboardInput['tiles'][number] | undefined;
 
       if (name !== undefined) {
         setPayload.name = name;
@@ -184,22 +176,16 @@ export function registerPatchDashboard({
         if (!isConfigTile(mergedTile)) {
           return mcpUserError('Tile must have a config block.');
         }
-        const internalTile = convertToInternalTileConfig(mergedTile);
-
-        // Use the positional $ operator matched by 'tiles.id' in the
-        // query filter. This targets the tile by its id field rather
-        // than a captured numeric index, so a concurrent save_dashboard
-        // that replaces the whole tiles array can't cause us to
-        // overwrite an unrelated tile at a stale index.
-        queryFilter['tiles.id'] = tileId;
-        setPayload['tiles.$'] = internalTile;
+        internalTile = convertToInternalTileConfig(mergedTile);
         patchedTile = mergedTile;
       }
 
-      const updatedDashboard = await Dashboard.findOneAndUpdate(
-        queryFilter,
-        { $set: setPayload },
-        { new: true },
+      const updatedDashboard = dashboardsRepo.patchTile(
+        dashboardId,
+        teamId,
+        tileId,
+        internalTile,
+        setPayload,
       );
 
       if (!updatedDashboard) {
