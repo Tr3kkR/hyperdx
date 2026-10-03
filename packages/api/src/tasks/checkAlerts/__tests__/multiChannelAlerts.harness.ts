@@ -4,7 +4,6 @@ import ms from 'ms';
 import * as config from '@/config';
 import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import { bulkInsertLogs } from '@/fixtures';
-import Alert from '@/models/alert';
 import { SavedSearch } from '@/models/savedSearch';
 import Webhook from '@/models/webhook';
 import { processAlert } from '@/tasks/checkAlerts';
@@ -12,6 +11,7 @@ import { AlertTaskType } from '@/tasks/checkAlerts/providers';
 import {
   createConnectionFixture,
   createSourceFixture,
+  findAlertFixture,
 } from '@/test/sqliteMetadata';
 
 // Shared setup for the multi-channel dispatch scenarios. Kept out of the spec
@@ -117,7 +117,7 @@ export const runAlert = async ({
   savedSearch: any;
   webhooks: IWebhook[];
 }) => {
-  const enhancedAlert: any = await Alert.findById(alertId);
+  const enhancedAlert: any = findAlertFixture(alertId);
   const details: any = {
     alert: enhancedAlert,
     source,
@@ -139,5 +139,5 @@ export const runAlert = async ({
     alertProvider,
     new Map(webhooks.map(w => [w._id.toString(), w])),
   );
-  return Alert.findById(alertId);
+  return findAlertFixture(alertId);
 };

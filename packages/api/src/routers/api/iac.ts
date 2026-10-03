@@ -5,15 +5,14 @@ import {
   isImportableSource,
 } from '@hyperdx/common-utils/dist/iac';
 import express from 'express';
-import type { Query } from 'mongoose';
 
+import * as alertsRepo from '@/db/repos/alerts';
 import * as connectionsRepo from '@/db/repos/connections';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as savedSearchesRepo from '@/db/repos/savedSearches';
 import * as sourcesRepo from '@/db/repos/sources';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import { getNonNullUserWithTeam } from '@/middleware/auth';
-import Alert from '@/models/alert';
 import { unaddressableTileAlertIds } from '@/utils/iacTileAlerts';
 import { getCounter, withSpan } from '@/utils/instrumentation';
 
@@ -56,21 +55,6 @@ const manifestUnexportableSources = getCounter(
       'Sources withheld from Terraform export because the provider cannot model their kind.',
   },
 );
-
-// Bounds a find without touching its result type. Only sort/limit/maxTimeMS
-// are wrapped — all three return the same Query — so `.lean()` stays on the
-// concrete model. Typing the whole chain instead collapses Source's
-// discriminated union into its first member.
-//
-// The sort is what makes a capped listing meaningful: without it, *which*
-// IAC_MANIFEST_LIMIT rows come back is planner-dependent and can differ
-// between two calls, so a large team could get a different arbitrary subset
-// each export. `{ team: 1, _id: 1 }` covers this ordering on every model here.
-const bounded = <T extends Query<unknown, unknown>>(query: T): T =>
-  query
-    .sort({ _id: 1 })
-    .limit(IAC_MANIFEST_LIMIT + 1)
-    .maxTimeMS(IAC_MANIFEST_MAX_TIME_MS) as T;
 
 /**
  * Each find asks for one row more than the ceiling, so a full page is
@@ -128,14 +112,19 @@ router.get('/import-manifest', async (req, res, next) => {
             .slice(0, IAC_MANIFEST_LIMIT + 1)
             .map(({ _id, name, tiles }) => ({ _id, name, tiles })),
         ),
-        bounded(
-          Alert.find(
-            { team: teamId },
-            // dashboard/tileId are read only to resolve the tile's name below,
-            // and stay out of the response — the import id is the alert's own.
-            { name: 1, source: 1, savedSearch: 1, dashboard: 1, tileId: 1 },
-          ),
-        ).lean(),
+        Promise.resolve(
+          alertsRepo
+            .list(teamId)
+            .slice(0, IAC_MANIFEST_LIMIT + 1)
+            .map(({ _id, name, source, savedSearch, dashboard, tileId }) => ({
+              _id,
+              name,
+              source,
+              savedSearch,
+              dashboard,
+              tileId,
+            })),
+        ),
         Promise.resolve(
           savedSearchesRepo
             .list(String(teamId))

@@ -6,7 +6,8 @@ import {
   getServer,
   randomMongoId,
 } from '@/fixtures';
-import Alert, { AlertSource, AlertState } from '@/models/alert';
+import { AlertSource, AlertState } from '@/models/alert';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 import { createDashboardFixture } from '@/test/sqliteMetadata';
 import { createWebhookFixture } from '@/test/sqliteMetadata';
 import { createSavedSearchFixture } from '@/test/sqliteMetadata';
@@ -202,7 +203,7 @@ describe('iac router', () => {
       source: source._id,
     });
 
-    await Alert.create({
+    await createAlertFixture({
       team: team._id,
       name: 'Too many errors',
       source: AlertSource.SAVED_SEARCH,
@@ -276,7 +277,7 @@ describe('iac router', () => {
     });
 
     const tileAlert = async (name: string, tileId: string) =>
-      Alert.create({
+      createAlertFixture({
         team: team._id,
         name,
         source: AlertSource.TILE,
@@ -330,7 +331,7 @@ describe('iac router', () => {
         },
       ],
     });
-    await Alert.create({
+    await createAlertFixture({
       team: team._id,
       name: 'On provisioned',
       source: AlertSource.TILE,
@@ -370,7 +371,7 @@ describe('iac router', () => {
     });
 
     const alert = async (name: string, dashboardId: unknown) =>
-      Alert.create({
+      createAlertFixture({
         team: team._id,
         name,
         source: AlertSource.TILE,
@@ -480,7 +481,7 @@ describe('iac router', () => {
       tiles: [],
       team: otherTeam,
     });
-    await Alert.create({
+    await createAlertFixture({
       team: otherTeam,
       threshold: 1,
       interval: '5m',

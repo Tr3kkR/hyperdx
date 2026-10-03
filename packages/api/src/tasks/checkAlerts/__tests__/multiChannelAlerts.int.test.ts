@@ -3,14 +3,11 @@ import mongoose from 'mongoose';
 
 import { createAlert } from '@/controllers/alerts';
 import { createTeam } from '@/controllers/team';
+import * as historiesRepo from '@/db/repos/alertHistories';
 import { getServer } from '@/fixtures';
-import Alert, {
-  AlertSource,
-  AlertState,
-  AlertThresholdType,
-} from '@/models/alert';
-import AlertHistory from '@/models/alertHistory';
+import { AlertSource, AlertState, AlertThresholdType } from '@/models/alert';
 import { loadProvider } from '@/tasks/checkAlerts/providers';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 
 import {
   HOOK_A,
@@ -141,10 +138,9 @@ describe('Multi-channel alert dispatch', () => {
       AlertErrorType.WEBHOOK_ERROR,
     );
 
-    const errorHistories = await AlertHistory.find({
-      alert: alert.id,
-      state: AlertState.ERROR,
-    });
+    const errorHistories = historiesRepo
+      .listByAlert(alert.id)
+      .filter(history => history.state === AlertState.ERROR);
     expect(errorHistories).toHaveLength(1);
     expect(errorHistories[0].errors).toHaveLength(1);
     expect(errorHistories[0].errors![0].type).toBe(
@@ -189,10 +185,9 @@ describe('Multi-channel alert dispatch', () => {
     );
     expect(updated!.executionErrors![0].message).toContain('Hook Bad');
 
-    const errorHistories = await AlertHistory.find({
-      alert: alert.id,
-      state: AlertState.ERROR,
-    });
+    const errorHistories = historiesRepo
+      .listByAlert(alert.id)
+      .filter(history => history.state === AlertState.ERROR);
     expect(errorHistories).toHaveLength(1);
     expect(errorHistories[0].errors).toHaveLength(1);
     expect(errorHistories[0].errors![0].type).toBe(
@@ -206,7 +201,7 @@ describe('Multi-channel alert dispatch', () => {
 
     // Written directly, bypassing makeAlert, to simulate a document stored
     // before `channels` existed.
-    const alert = await new Alert({
+    const alert = createAlertFixture({
       team: team._id,
       source: AlertSource.SAVED_SEARCH,
       channel: { type: 'webhook', webhookId: webhook._id.toString() },
@@ -216,7 +211,7 @@ describe('Multi-channel alert dispatch', () => {
       savedSearch: savedSearch._id,
       name: 'Legacy Alert',
       state: 'OK',
-    }).save();
+    });
 
     expect(alert.channels).toBeUndefined();
 

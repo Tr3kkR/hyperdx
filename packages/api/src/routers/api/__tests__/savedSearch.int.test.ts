@@ -12,7 +12,7 @@ import {
   findSavedSearchFixture,
   setSavedSearchUpdatedByFixture,
 } from '@/test/sqliteMetadata';
-
+import { findAlertFixture } from '@/test/sqliteMetadata';
 const MOCK_SAVED_SEARCH = {
   name: 'error',
   select: 'Timestamp, ServiceName, SeverityText, Body',
@@ -131,7 +131,7 @@ describe('savedSearch router', () => {
     await agent.delete(`/saved-search/${savedSearch.body._id}`).expect(204);
     const savedSearches = await agent.get('/saved-search').expect(200);
     expect(savedSearches.body.length).toBe(0);
-    expect(await Alert.findById(alert.body.data._id)).toBeNull();
+    expect(await findAlertFixture(alert.body.data._id)).toBeNull();
   });
 
   it('sets createdBy and updatedBy on create and populates them in GET', async () => {
@@ -211,7 +211,7 @@ describe('savedSearch router', () => {
       .expect(200);
 
     // Verify createdBy was set on the alert document
-    const alertFromDb = await Alert.findById(alert.body.data._id);
+    const alertFromDb = await findAlertFixture(alert.body.data._id);
     expect(alertFromDb).toBeDefined();
     expect(String(alertFromDb!.createdBy)).toEqual(user._id);
 

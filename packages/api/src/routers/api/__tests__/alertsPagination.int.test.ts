@@ -9,8 +9,9 @@ import {
   makeTile,
   randomMongoId,
 } from '@/fixtures';
-import Alert, { AlertSource, AlertState } from '@/models/alert';
+import { AlertSource, AlertState } from '@/models/alert';
 import { WebhookService } from '@/models/webhook';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 import { createWebhookFixture } from '@/test/sqliteMetadata';
 import { createSavedSearchFixture } from '@/test/sqliteMetadata';
 
@@ -58,7 +59,7 @@ describe('alerts list paging and filtering', () => {
   // endpoint derives displayName/tags when they're absent, and these tests need
   // documents that genuinely have none.
   const createAlert = (overrides: Record<string, unknown> = {}) =>
-    Alert.create({
+    createAlertFixture({
       team: team._id,
       channel: { type: 'webhook', webhookId: webhook._id.toString() },
       interval: '15m',
@@ -279,12 +280,8 @@ describe('alerts list paging and filtering', () => {
       expect(await listIds('?state=ALERT&state=OK')).toHaveLength(2);
     });
 
-    it('matches documents with no state field when filtering by OK', async () => {
-      // The model defaults `state` to OK, so unset it to reproduce a document
-      // written before the field existed. It renders as OK, so the OK filter
-      // has to return it.
-      const legacy = await createAlert({ displayName: 'Legacy' });
-      await Alert.updateOne({ _id: legacy._id }, { $unset: { state: 1 } });
+    it('matches the SQLite default OK state', async () => {
+      const legacy = await createAlert({ displayName: 'Default state' });
       const firing = await createAlert({
         displayName: 'Firing',
         state: AlertState.ALERT,
@@ -295,21 +292,19 @@ describe('alerts list paging and filtering', () => {
       expect(await listIds('?state=OK&state=ALERT')).toHaveLength(2);
     });
 
-    it('matches documents with no source field when filtering by saved_search', async () => {
+    it('filters a saved-search alert by source', async () => {
       const savedSearch = await createSavedSearchFixture({
         name: 'Legacy search',
         source: new mongoose.Types.ObjectId(),
         team: team._id,
       });
-      // The model defaults `source` to saved_search, so unset it to reproduce a
-      // document written before the field existed.
       const legacy = await createAlert({
         displayName: 'Legacy',
+        source: AlertSource.SAVED_SEARCH,
         dashboard: undefined,
         tileId: undefined,
         savedSearch: savedSearch._id,
       });
-      await Alert.updateOne({ _id: legacy._id }, { $unset: { source: 1 } });
       const tile = await createAlert({ displayName: 'Tile' });
 
       expect(await listIds('?source=saved_search')).toEqual([

@@ -1,11 +1,11 @@
 import type { OnboardingTaskId } from '@hyperdx/common-utils/dist/types';
 import { isPersistableUserId as isPersistableUserIdHex } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
+import { getDb, withTransaction } from '@/db';
+import { normalizeId } from '@/db/ids';
 import * as users from '@/db/repos/users';
 import type { ObjectId } from '@/models';
-import Alert from '@/models/alert';
 import logger from '@/utils/logger';
 export function findUserByAccessKey(accessKey: string) {
   return users.findByAccessKey(accessKey);
@@ -92,14 +92,15 @@ export async function deleteTeamMember(
   userIdToDelete: string,
   userIdRequestingDelete: string | ObjectId,
 ) {
-  // sqlite-port: Mongo updateMany and findOneAndDelete must remain ordered.
-  await Alert.updateMany(
-    { createdBy: new mongoose.Types.ObjectId(userIdToDelete), team: teamId },
-    {
-      $set: {
-        createdBy: new mongoose.Types.ObjectId(String(userIdRequestingDelete)),
-      },
-    },
-  );
-  return users.deleteById(userIdToDelete, String(teamId));
+  return withTransaction(() => {
+    // sqlite-port: Mongo updateMany before findOneAndDelete is one transaction.
+    getDb()
+      .prepare('UPDATE alerts SET createdBy=? WHERE createdBy=? AND team=?')
+      .run(
+        normalizeId(String(userIdRequestingDelete)),
+        normalizeId(userIdToDelete),
+        normalizeId(String(teamId)),
+      );
+    return users.deleteById(userIdToDelete, String(teamId));
+  });
 }

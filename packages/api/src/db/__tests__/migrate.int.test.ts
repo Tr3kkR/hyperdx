@@ -19,7 +19,7 @@ test('migrates a new database once and preserves rows on re-run', () => {
   openDb(file);
   migrate();
   const db = getDb();
-  expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 1 });
+  expect(db.prepare('PRAGMA user_version').get()).toEqual({ user_version: 2 });
   db.prepare('INSERT INTO sessions(sid,expiresAt,data) VALUES(?,?,?)').run(
     'session',
     Date.now() + 1000,

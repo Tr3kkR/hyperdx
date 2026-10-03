@@ -6,19 +6,20 @@ import ms from 'ms';
 import * as config from '@/config';
 import { createAlert } from '@/controllers/alerts';
 import { createTeam } from '@/controllers/team';
+import * as historiesRepo from '@/db/repos/alertHistories';
 import {
   bulkInsertLogs,
   getServer,
   RAW_SQL_NUMBER_ALERT_TEMPLATE,
 } from '@/fixtures';
-import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
-import AlertHistory from '@/models/alertHistory';
+import { AlertSource, AlertThresholdType } from '@/models/alert';
 import { processAlert } from '@/tasks/checkAlerts';
 import {
   AlertDetails,
   AlertTaskType,
   loadProvider,
 } from '@/tasks/checkAlerts/providers';
+import { findAlertFixture } from '@/test/sqliteMetadata';
 import { createDashboardFixture } from '@/test/sqliteMetadata';
 import { createWebhookFixture } from '@/test/sqliteMetadata';
 import { createSavedSearchFixture } from '@/test/sqliteMetadata';
@@ -181,7 +182,7 @@ describe('Single Invocation Alert Test', () => {
     ]);
 
     // Get the alert with populated references
-    const enhancedAlert: any = await Alert.findById(alert.id);
+    const enhancedAlert: any = await findAlertFixture(alert.id);
 
     // Process the alert - this should trigger the webhook
     const details: any = {
@@ -207,12 +208,12 @@ describe('Single Invocation Alert Test', () => {
     );
 
     // Verify alert state changed to ALERT (from DB)
-    expect((await Alert.findById(enhancedAlert.id))!.state).toBe('ALERT');
+    expect((await findAlertFixture(enhancedAlert.id))!.state).toBe('ALERT');
 
     // Verify alert history was created
-    const alertHistories = await AlertHistory.find({
-      alert: alert.id,
-    }).sort({ createdAt: 1 });
+    const alertHistories = historiesRepo
+      .listByAlert(alert.id)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     expect(alertHistories.length).toBe(1);
     expect(alertHistories[0].state).toBe('ALERT');
@@ -354,7 +355,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id);
+    const enhancedAlert: any = await findAlertFixture(alert.id);
 
     const details: any = {
       alert: enhancedAlert,
@@ -380,11 +381,11 @@ describe('Single Invocation Alert Test', () => {
     );
 
     // Alert should fire because 2 "web" logs exceed threshold of 1
-    expect((await Alert.findById(enhancedAlert.id))!.state).toBe('ALERT');
+    expect((await findAlertFixture(enhancedAlert.id))!.state).toBe('ALERT');
 
-    const alertHistories = await AlertHistory.find({
-      alert: alert.id,
-    }).sort({ createdAt: 1 });
+    const alertHistories = historiesRepo
+      .listByAlert(alert.id)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     expect(alertHistories.length).toBe(1);
     expect(alertHistories[0].state).toBe('ALERT');
@@ -479,7 +480,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id);
+    const enhancedAlert: any = await findAlertFixture(alert.id);
 
     const details: any = {
       alert: enhancedAlert,
@@ -505,7 +506,7 @@ describe('Single Invocation Alert Test', () => {
     );
 
     // Alert should NOT fire because filter excludes all logs
-    expect((await Alert.findById(enhancedAlert.id))!.state).toBe('OK');
+    expect((await findAlertFixture(enhancedAlert.id))!.state).toBe('OK');
 
     // No webhook notification should be sent
     expect(slack.postMessageToWebhook).not.toHaveBeenCalled();
@@ -615,7 +616,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id);
+    const enhancedAlert: any = await findAlertFixture(alert.id);
 
     const details: any = {
       alert: enhancedAlert,
@@ -642,7 +643,7 @@ describe('Single Invocation Alert Test', () => {
 
     // Alert should NOT fire: only 1 web error matches both conditions,
     // which is below threshold of 2 (ABOVE uses >=)
-    expect((await Alert.findById(enhancedAlert.id))!.state).toBe('OK');
+    expect((await findAlertFixture(enhancedAlert.id))!.state).toBe('OK');
     expect(slack.postMessageToWebhook).not.toHaveBeenCalled();
   });
 
@@ -782,7 +783,7 @@ describe('Single Invocation Alert Test', () => {
     );
 
     // Get enhanced alert with populated relations
-    const enhancedAlert: any = await Alert.findById(alert.id);
+    const enhancedAlert: any = await findAlertFixture(alert.id);
 
     // Find the tile we're alerting on (should be the second tile)
     const tile = dashboard.tiles?.find((t: any) => t.id === 'second-tile-id');
@@ -934,7 +935,7 @@ describe('Single Invocation Alert Test', () => {
       },
     ]);
 
-    const enhancedAlert: any = await Alert.findById(alert.id);
+    const enhancedAlert: any = await findAlertFixture(alert.id);
 
     const tile = dashboard.tiles?.find((t: any) => t.id === 'number-tile-1');
 
@@ -963,12 +964,12 @@ describe('Single Invocation Alert Test', () => {
     );
 
     // Verify alert state changed to ALERT
-    expect((await Alert.findById(enhancedAlert.id))!.state).toBe('ALERT');
+    expect((await findAlertFixture(enhancedAlert.id))!.state).toBe('ALERT');
 
     // Verify alert history was created
-    const alertHistories = await AlertHistory.find({
-      alert: alert.id,
-    }).sort({ createdAt: 1 });
+    const alertHistories = historiesRepo
+      .listByAlert(alert.id)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
     expect(alertHistories.length).toBe(1);
     expect(alertHistories[0].state).toBe('ALERT');

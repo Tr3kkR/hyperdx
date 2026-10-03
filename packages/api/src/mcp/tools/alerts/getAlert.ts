@@ -1,15 +1,15 @@
 import { type AlertInterval } from '@hyperdx/common-utils/dist/types';
 import { ObjectId } from 'mongodb';
-import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import * as config from '@/config';
 import { getRecentAlertHistories } from '@/controllers/alertHistory';
 import { getAlertById } from '@/controllers/alerts';
 import { withDisplayRefs } from '@/controllers/alerts';
+import * as alertsRepo from '@/db/repos/alerts';
 import type { ToolRegistrar } from '@/mcp/tools/types';
 import { mcpUserError, validateObjectId } from '@/mcp/utils/errors';
-import Alert from '@/models/alert';
+import { AlertState } from '@/models/alert';
 import { translateAlertDocumentToExternalAlertWithChartConfig } from '@/routers/external-api/v2/utils/alertChartConfig';
 import { resolveAlertDisplayFields } from '@/utils/alerts';
 
@@ -51,13 +51,10 @@ export function registerGetAlert({
     async ({ id, state }) => {
       // ── List all alerts (slim summary) ──
       if (!id) {
-        const query: Record<string, unknown> = {
-          team: new mongoose.Types.ObjectId(teamId),
-        };
-        if (state) {
-          query.state = state;
-        }
-        const alerts = (await Alert.find(query)).map(withDisplayRefs);
+        const alerts = alertsRepo
+          .list(teamId)
+          .filter(alert => !state || alert.state === (state as AlertState))
+          .map(withDisplayRefs);
 
         const output = alerts.map(alert => {
           const { displayName, tags } = resolveAlertDisplayFields(alert, {
@@ -76,7 +73,7 @@ export function registerGetAlert({
           });
           return {
             id: alert._id.toString(),
-            name: alert.name,
+            name: alert.name ?? undefined,
             displayName,
             tags,
             state: alert.state,

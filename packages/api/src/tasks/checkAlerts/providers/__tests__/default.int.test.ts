@@ -9,13 +9,16 @@ import {
   makeTile,
   RAW_SQL_ALERT_TEMPLATE,
 } from '@/fixtures';
-import Alert, { AlertSource, AlertThresholdType } from '@/models/alert';
+import { AlertSource, AlertThresholdType } from '@/models/alert';
 import {
   AlertProvider,
   AlertTaskType,
   loadProvider,
 } from '@/tasks/checkAlerts/providers';
-import { createDashboardFixture } from '@/test/sqliteMetadata';
+import {
+  createAlertFixture,
+  createDashboardFixture,
+} from '@/test/sqliteMetadata';
 import { createSavedSearchFixture } from '@/test/sqliteMetadata';
 import {
   createConnectionFixture,
@@ -222,7 +225,7 @@ describe('DefaultAlertProvider', () => {
 
       // Create alert directly in database with non-existent saved search
       // This simulates an alert that exists but references a deleted saved search
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: AlertSource.SAVED_SEARCH,
         savedSearch: new mongoose.Types.ObjectId(), // Non-existent ID
@@ -243,7 +246,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create alert directly without source
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         threshold: 10,
         thresholdType: AlertThresholdType.ABOVE,
@@ -468,7 +471,7 @@ describe('DefaultAlertProvider', () => {
 
       // Create alert directly in database with non-existent dashboard
       // This simulates an alert that exists but references a deleted dashboard
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: AlertSource.TILE,
         dashboard: new mongoose.Types.ObjectId(), // Non-existent ID
@@ -496,7 +499,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create alert directly in database with non-existent tile ID
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: AlertSource.TILE,
         dashboard: dashboard._id,
@@ -529,7 +532,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create alert directly in database
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: AlertSource.TILE,
         dashboard: dashboard._id,
@@ -575,7 +578,7 @@ describe('DefaultAlertProvider', () => {
       });
 
       // Create alert directly in database
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: AlertSource.SAVED_SEARCH,
         savedSearch: savedSearch._id,
@@ -596,7 +599,7 @@ describe('DefaultAlertProvider', () => {
       const team = await createTeam({ name: 'Test Team' });
 
       // Create alert with invalid source
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: 'UNSUPPORTED_SOURCE' as any,
         threshold: 10,

@@ -3,8 +3,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import * as Team from '@/db/repos/teams';
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import { McpContext } from '@/mcp/tools/types';
-import Alert from '@/models/alert';
 import { WebhookService } from '@/models/webhook';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 import {
   createWebhookFixture,
   findWebhookFixture,
@@ -281,7 +281,7 @@ describe('MCP Webhook Tools', () => {
         service: WebhookService.Generic,
         url: 'https://example.com/webhook',
       });
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         source: 'saved_search',
         threshold: 1,

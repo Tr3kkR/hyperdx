@@ -1,7 +1,7 @@
+import * as alertsRepo from '@/db/repos/alerts';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import { WebhookService } from '@/db/repos/webhooks';
 import type { ObjectId } from '@/models';
-import Alert from '@/models/alert';
 import { validateWebhookUrl } from '@/utils/validators';
 
 export interface WebhookInput {
@@ -122,13 +122,7 @@ export async function deleteWebhook(
 ): Promise<DeleteWebhookResult> {
   // Match on webhookId alone (not channel.type) so a legacy/skewed alert that
   // still references this webhook also blocks deletion.
-  const alertCount = await Alert.countDocuments({
-    team,
-    $or: [
-      { 'channel.webhookId': webhookId },
-      { 'channels.webhookId': webhookId },
-    ],
-  });
+  const alertCount = alertsRepo.countReferencingWebhook(team, webhookId);
   if (alertCount > 0) {
     return { status: 'referenced', alertCount };
   }

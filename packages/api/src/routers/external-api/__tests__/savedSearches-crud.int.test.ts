@@ -12,6 +12,7 @@ import {
   getServer,
 } from '@/fixtures';
 import Alert, { AlertSource, AlertState } from '@/models/alert';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 import {
   createSavedSearchFixture,
   findSavedSearchFixture,
@@ -546,7 +547,7 @@ describe('External API v2 Saved Searches CRUD', () => {
         .expect(200);
       const savedSearchId = created.body.data.id;
 
-      await Alert.create({
+      await createAlertFixture({
         team: team._id,
         savedSearch: savedSearchId,
         source: AlertSource.SAVED_SEARCH,

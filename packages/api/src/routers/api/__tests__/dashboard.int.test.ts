@@ -8,6 +8,8 @@ import {
 import { omit } from 'lodash';
 import mongoose, { Types } from 'mongoose';
 
+import { getDb } from '@/db';
+import * as alertsRepo from '@/db/repos/alerts';
 import * as presetFilters from '@/db/repos/presetDashboardFilters';
 import * as users from '@/db/repos/users';
 import type { WebhookDoc } from '@/db/repos/webhooks';
@@ -18,7 +20,6 @@ import {
   makeRawSqlTile,
   makeTile,
 } from '@/fixtures';
-import Alert, { AlertSource } from '@/models/alert';
 import { WebhookService } from '@/models/webhook';
 import {
   createDashboardFixture,
@@ -259,12 +260,11 @@ describe('dashboard router', () => {
       },
     ]);
 
-    const storedAlert = await Alert.findOne({
-      team: team._id,
-      dashboard: dashboard.body.id,
-      tileId: dashboard.body.tiles[0].id,
-      source: AlertSource.TILE,
-    });
+    const storedAlert = alertsRepo.findTileAlert(
+      team._id,
+      dashboard.body.id,
+      dashboard.body.tiles[0].id,
+    );
     expect(storedAlert).not.toBeNull();
     expect(storedAlert?.savedSearch).toBeNull();
     expect(storedAlert?.groupBy).toBeNull();
@@ -284,10 +284,9 @@ describe('dashboard router', () => {
       })
       .expect(200);
     // Alerts written before the fields existed.
-    await Alert.updateMany(
-      { dashboard: dashboard.body.id },
-      { $set: { displayName: null, tags: null } },
-    );
+    getDb()
+      .prepare('UPDATE alerts SET displayName=NULL,tags=NULL WHERE dashboard=?')
+      .run(dashboard.body.id);
 
     const list = await agent.get('/dashboards').expect(200);
     const fromList = list.body.find(d => d._id === dashboard.body.id);
@@ -323,12 +322,11 @@ describe('dashboard router', () => {
       })
       .expect(200);
 
-    const storedAlert = await Alert.findOne({
-      team: team._id,
-      dashboard: dashboard.body.id,
-      tileId: dashboard.body.tiles[0].id,
-      source: AlertSource.TILE,
-    });
+    const storedAlert = alertsRepo.findTileAlert(
+      team._id,
+      dashboard.body.id,
+      dashboard.body.tiles[0].id,
+    );
     expect(storedAlert?.displayName).toBe('Checkout errors');
   });
 
@@ -356,11 +354,11 @@ describe('dashboard router', () => {
       })
       .expect(200);
 
-    const storedAlert = await Alert.findOne({
-      team: team._id,
-      dashboard: dashboard.body.id,
-      source: AlertSource.TILE,
-    });
+    const storedAlert = alertsRepo.findTileAlert(
+      team._id,
+      dashboard.body.id,
+      dashboard.body.tiles[0].id,
+    );
     expect(storedAlert).not.toBeNull();
     expect(storedAlert?.channels).toEqual([
       { type: 'webhook', webhookId: webhook._id.toString() },
@@ -555,12 +553,13 @@ describe('dashboard router', () => {
       },
     ]);
 
-    const storedAlerts = await Alert.find({
-      team: team._id,
-      dashboard: dashboard.body.id,
-      tileId: dashboard.body.tiles[0].id,
-      source: AlertSource.TILE,
-    });
+    const storedAlerts = [
+      alertsRepo.findTileAlert(
+        team._id,
+        dashboard.body.id,
+        dashboard.body.tiles[0].id,
+      ),
+    ].filter(alert => alert != null);
     expect(storedAlerts).toHaveLength(1);
     expect(storedAlerts[0].threshold).toBe(updatedAlert.threshold);
   });
@@ -715,7 +714,11 @@ describe('dashboard router', () => {
     const tileId = dashboard.tiles[0].id;
 
     // Setup: Simulate alert created by different user
-    const originalAlert = await Alert.findOne({ tileId });
+    const originalAlert = alertsRepo.findTileAlert(
+      team._id,
+      dashboard.id,
+      tileId,
+    );
 
     if (!originalAlert) {
       throw new Error('Original alert not found');
@@ -723,8 +726,9 @@ describe('dashboard router', () => {
 
     // Set the original creator to a different user
     const originalCreatorId = new mongoose.Types.ObjectId();
-    originalAlert.createdBy = originalCreatorId;
-    await originalAlert.save({ validateBeforeSave: false });
+    alertsRepo.update(originalAlert.id, team._id, {
+      createdBy: originalCreatorId,
+    });
 
     // Act: Current user updates the dashboard (modifies alert threshold)
     const updatedThreshold = 5;
@@ -750,7 +754,11 @@ describe('dashboard router', () => {
       .expect(200);
 
     // Assert: Verify alert preserves original creator and updates threshold
-    const updatedAlertRecord = await Alert.findOne({ tileId });
+    const updatedAlertRecord = alertsRepo.findTileAlert(
+      team._id,
+      dashboard.id,
+      tileId,
+    );
     expect(updatedAlertRecord).toBeTruthy();
 
     if (!updatedAlertRecord) {

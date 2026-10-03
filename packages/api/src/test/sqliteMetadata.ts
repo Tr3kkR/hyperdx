@@ -2,6 +2,8 @@ import type { TSourceNoId } from '@hyperdx/common-utils/dist/types';
 
 import { getDb } from '@/db';
 import { newId } from '@/db/ids';
+import * as alertHistories from '@/db/repos/alertHistories';
+import * as alerts from '@/db/repos/alerts';
 import * as connections from '@/db/repos/connections';
 import * as dashboards from '@/db/repos/dashboards';
 import * as savedSearches from '@/db/repos/savedSearches';
@@ -10,6 +12,74 @@ import * as webhooks from '@/db/repos/webhooks';
 
 // Test setup inserts rows directly so route tests can exercise reads without
 // coupling their fixtures to the endpoint that writes the same table.
+type AlertFixtureInput = {
+  team: { toString(): string };
+  threshold: number;
+  interval: alerts.AlertFields['interval'];
+  [key: string]: unknown;
+};
+export function createAlertFixture(
+  input: AlertFixtureInput[],
+): alerts.AlertDoc[];
+export function createAlertFixture(input: AlertFixtureInput): alerts.AlertDoc;
+export function createAlertFixture(
+  input: AlertFixtureInput | AlertFixtureInput[],
+): alerts.AlertDoc | alerts.AlertDoc[] {
+  if (Array.isArray(input)) return input.map(row => createAlertFixture(row));
+  const { team, _id, ...row } = input;
+  return alerts.create(
+    String(team),
+    row as alerts.AlertFields,
+    _id == null ? undefined : String(_id),
+  );
+}
+
+export function findAlertFixture(id: { toString(): string }) {
+  return alerts.findById(id);
+}
+
+export function updateAlertFixture(
+  id: { toString(): string },
+  fields: Partial<alerts.AlertFields>,
+) {
+  const alert = alerts.findById(id);
+  if (!alert) throw new Error(`Alert ${id} not found`);
+  return alerts.update(id, alert.team, fields);
+}
+
+export function setAlertExecutionErrorsFixture(
+  id: { toString(): string },
+  errors: unknown[],
+) {
+  getDb()
+    .prepare('UPDATE alerts SET executionErrors=? WHERE id=?')
+    .run(JSON.stringify(errors), String(id));
+}
+
+export function createAlertHistoryFixture(
+  input: alertHistories.HistoryInput[],
+): alertHistories.HistoryDoc[];
+export function createAlertHistoryFixture(
+  input: alertHistories.HistoryInput,
+): alertHistories.HistoryDoc;
+export function createAlertHistoryFixture(
+  input: alertHistories.HistoryInput | alertHistories.HistoryInput[],
+): alertHistories.HistoryDoc | alertHistories.HistoryDoc[] {
+  return Array.isArray(input)
+    ? alertHistories.createMany(input)
+    : alertHistories.create(input);
+}
+
+export function listAlertHistoryFixtures(alert: { toString(): string }) {
+  return alertHistories
+    .listByAlert(alert)
+    .sort(
+      (a, b) =>
+        a.createdAt.getTime() - b.createdAt.getTime() ||
+        a._id.localeCompare(b._id),
+    );
+}
+
 export function createConnectionFixture(input: {
   team: { toString(): string };
   [key: string]: unknown;

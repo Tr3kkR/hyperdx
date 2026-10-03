@@ -1,120 +1,94 @@
-import mongoose from 'mongoose';
-
+import { getDb, withTransaction } from '@/db';
+import * as alertsRepo from '@/db/repos/alerts';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as savedSearchesRepo from '@/db/repos/savedSearches';
-import Alert, { IAlert } from '@/models/alert';
 import { deriveAlertDisplayFields } from '@/utils/alerts';
 import logger from '@/utils/logger';
 
 const BACKFILL_BATCH_SIZE = 500;
 
-const DISPLAY_NAME_MISSING_FILTER = { displayName: { $in: [null, ''] } };
-// Matches missing/null only; a stored [] is already resolved and left alone.
-const TAGS_MISSING_FILTER = { tags: null };
+type Candidate = {
+  id: string;
+  team: string;
+  source: string | null;
+  savedSearch: string | null;
+  dashboard: string | null;
+  tileId: string | null;
+  chartConfig: string | null;
+};
 
 export async function backfillAlertDisplayFields() {
-  const ids = (
-    await Alert.find(
-      { $or: [DISPLAY_NAME_MISSING_FILTER, TAGS_MISSING_FILTER] },
-      { _id: 1 },
-    ).lean()
-  ).map(doc => doc._id);
-  if (ids.length === 0) {
-    return;
-  }
-
+  // sqlite-port: Mongo {$or: [{displayName: {$in:[null,'']}}, {tags:null}]}.
+  const ids = getDb()
+    .prepare(
+      `SELECT id FROM alerts WHERE displayName IS NULL OR displayName='' OR tags IS NULL`,
+    )
+    .all() as { id: string }[];
   let updatedCount = 0;
+
   for (let i = 0; i < ids.length; i += BACKFILL_BATCH_SIZE) {
-    const batch = await Alert.find(
-      { _id: { $in: ids.slice(i, i + BACKFILL_BATCH_SIZE) } },
-      {
-        displayName: 1,
-        tags: 1,
-        source: 1,
-        savedSearch: 1,
-        dashboard: 1,
-        tileId: 1,
-        'chartConfig.name': 1,
-      },
-    ).lean();
+    const batchIds = ids.slice(i, i + BACKFILL_BATCH_SIZE).map(row => row.id);
+    withTransaction(() => {
+      const batch = getDb()
+        .prepare(
+          `SELECT id,team,source,savedSearch,dashboard,tileId,chartConfig
+         FROM alerts WHERE id IN (${batchIds.map(() => '?').join(',')})`,
+        )
+        .all(...batchIds) as Candidate[];
 
-    const savedSearchIds = batch
-      .map(a => a.savedSearch)
-      .filter(id => id != null);
-    const dashboardIds = batch.map(a => a.dashboard).filter(id => id != null);
-    const [savedSearches, dashboards] = await Promise.all([
-      savedSearchIds.length > 0
-        ? savedSearchesRepo.findManyByIds(savedSearchIds.map(String))
-        : [],
-      dashboardIds.length > 0
-        ? dashboardsRepo.findManyByIds(dashboardIds.map(String))
-        : [],
-    ]);
-    const savedSearchById = new Map(
-      savedSearches.map(d => [String(d._id), d] as const),
-    );
-    const dashboardById = new Map(
-      dashboards.map(d => [String(d._id), d] as const),
-    );
-
-    const ops: {
-      filter: mongoose.FilterQuery<IAlert>;
-      update: { $set: { displayName: string } | { tags: string[] } };
-    }[] = [];
-    for (const alert of batch) {
-      const derived = deriveAlertDisplayFields(alert, {
-        savedSearch:
-          alert.savedSearch != null
-            ? savedSearchById.get(String(alert.savedSearch))
-            : undefined,
-        dashboard:
-          alert.dashboard != null
-            ? dashboardById.get(String(alert.dashboard))
-            : undefined,
-      });
-      const hasDisplayName =
-        typeof alert.displayName === 'string' && alert.displayName !== '';
-      const hasTags = alert.tags != null;
-
-      const inputsUnchangedFilter = {
-        source: alert.source ?? null,
-        savedSearch: alert.savedSearch ?? null,
-        dashboard: alert.dashboard ?? null,
-        tileId: alert.tileId ?? null,
-        'chartConfig.name': alert.chartConfig?.name ?? null,
-      };
-      if (!hasDisplayName && derived.displayName != null) {
-        ops.push({
-          filter: {
-            _id: alert._id,
-            ...inputsUnchangedFilter,
-            ...DISPLAY_NAME_MISSING_FILTER,
-          },
-          update: { $set: { displayName: derived.displayName } },
+      for (const row of batch) {
+        const alert = alertsRepo.findById(row.id, row.team);
+        if (!alert) continue;
+        const savedSearch =
+          row.savedSearch == null
+            ? null
+            : savedSearchesRepo.findById(row.savedSearch, row.team);
+        const dashboard =
+          row.dashboard == null
+            ? null
+            : dashboardsRepo.findById(row.dashboard, row.team);
+        const derived = deriveAlertDisplayFields(alert, {
+          savedSearch: savedSearch ?? undefined,
+          dashboard: dashboard ?? undefined,
         });
+        const unchanged = [
+          row.id,
+          row.source,
+          row.savedSearch,
+          row.dashboard,
+          row.tileId,
+          row.chartConfig,
+        ];
+        if (
+          (!alert.displayName || alert.displayName === '') &&
+          derived.displayName != null
+        ) {
+          // sqlite-port: Mongo bulkWrite CAS with timestamps:false. Compare
+          // the source refs and entire chartConfig; leave updatedAt untouched.
+          updatedCount += Number(
+            getDb()
+              .prepare(
+                `UPDATE alerts SET displayName=? WHERE id=?
+             AND source IS ? AND savedSearch IS ? AND dashboard IS ?
+             AND tileId IS ? AND chartConfig IS ?
+             AND (displayName IS NULL OR displayName='')`,
+              )
+              .run(derived.displayName, ...unchanged).changes,
+          );
+        }
+        if (alert.tags == null && derived.tags != null) {
+          updatedCount += Number(
+            getDb()
+              .prepare(
+                `UPDATE alerts SET tags=? WHERE id=?
+             AND source IS ? AND savedSearch IS ? AND dashboard IS ?
+             AND tileId IS ? AND chartConfig IS ? AND tags IS NULL`,
+              )
+              .run(JSON.stringify(derived.tags), ...unchanged).changes,
+          );
+        }
       }
-
-      if (!hasTags && derived.tags != null) {
-        ops.push({
-          filter: {
-            _id: alert._id,
-            ...inputsUnchangedFilter,
-            ...TAGS_MISSING_FILTER,
-          },
-          update: { $set: { tags: derived.tags } },
-        });
-      }
-    }
-
-    if (ops.length > 0) {
-      // Per-op timestamps because the bulkWrite-level option only covers
-      // inserts; without it the backfill bumps the user-visible updatedAt.
-      const result = await Alert.bulkWrite(
-        ops.map(op => ({ updateOne: { ...op, timestamps: false } })),
-        { ordered: false },
-      );
-      updatedCount += result.modifiedCount;
-    }
+    });
   }
 
   logger.info(

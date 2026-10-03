@@ -2,14 +2,12 @@ import {
   TagResourceType,
   TeamClickHouseSettingsUpdate,
 } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 
 import * as config from '@/config';
 import { getDb, withTransaction } from '@/db';
 import * as teams from '@/db/repos/teams';
 import type { ObjectId } from '@/models';
-import Alert from '@/models/alert';
 
 export function getTeamInviteUrl(token: string) {
   return `${config.FRONTEND_URL}/join-team?token=${token}`;
@@ -130,12 +128,14 @@ export async function getTags(
     rows.forEach(row => tags.add(row.tag));
   }
   if (resourceType == null || resourceType === 'alert') {
-    const rows = await Alert.aggregate<{ _id: string }>([
-      { $match: { team: new mongoose.Types.ObjectId(String(teamId)) } },
-      { $unwind: '$tags' },
-      { $group: { _id: '$tags' } },
-    ]);
-    rows.forEach(row => tags.add(row._id));
+    // sqlite-port: Mongo $unwind/$group distinct alert tags.
+    const rows = getDb()
+      .prepare(
+        `SELECT DISTINCT j.value AS tag FROM alerts a,
+       json_each(a.tags) j WHERE a.team=?`,
+      )
+      .all(String(teamId)) as { tag: string }[];
+    rows.forEach(row => tags.add(row.tag));
   }
   return [...tags];
 }

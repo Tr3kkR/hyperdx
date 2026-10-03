@@ -15,6 +15,7 @@ import {
   getTeamDashboardAlertsByDashboardAndTile,
 } from '@/controllers/alerts';
 import { recordOnboardingTaskCompletion } from '@/controllers/user';
+import type { AlertDoc } from '@/db/repos/alerts';
 import type { DashboardDoc } from '@/db/repos/dashboards';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import { hydrateUsers } from '@/db/repos/users';
@@ -137,14 +138,14 @@ async function syncDashboardAlerts(
  * values for alerts written before the fields existed.
  */
 function withResolvedDisplayFields(
-  alert: AlertDocument | undefined,
+  alert: AlertDoc | undefined,
   dashboard: Pick<DashboardDoc, 'name' | 'tags' | 'tiles'>,
 ) {
   if (alert == null) {
     return undefined;
   }
   return {
-    ...hydrateUsers([alert.toJSON()], ['createdBy'])[0],
+    ...hydrateUsers([alert], ['createdBy'])[0],
     ...resolveAlertDisplayFields(alert, { dashboard }),
   };
 }

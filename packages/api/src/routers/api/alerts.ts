@@ -23,6 +23,7 @@ import {
   deleteAlert,
   getAlertById,
   getAlertEnhanced,
+  setAlertSilenced,
   updateAlert,
   validateAlertInput,
 } from '@/controllers/alerts';
@@ -422,12 +423,11 @@ router.post(
       if (!alert) {
         return res.status(404).json({ error: 'Alert not found' });
       }
-      alert.silenced = {
+      setAlertSilenced(req.params.id, teamId, {
         by: req.user._id,
         at: new Date(),
         until: new Date(req.body.mutedUntil),
-      };
-      await alert.save();
+      });
 
       res.sendStatus(200);
     } catch (e) {
@@ -454,8 +454,7 @@ router.delete(
       if (!alert) {
         return res.status(404).json({ error: 'Alert not found' });
       }
-      alert.silenced = undefined;
-      await alert.save();
+      setAlertSilenced(req.params.id, teamId);
 
       res.sendStatus(200);
     } catch (e) {
