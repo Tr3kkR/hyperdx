@@ -1,5 +1,5 @@
 import { MetricsDataType, SourceKind } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 import request, { SuperAgentTest } from 'supertest';
 
 import * as config from '@/config';
@@ -41,7 +41,7 @@ describe('External API v2 Sources', () => {
     user = result.user;
 
     connection = await createConnectionFixture({
-      team: new mongoose.Types.ObjectId(team._id),
+      team: new ObjectId(team._id),
       name: 'Default',
       host: config.CLICKHOUSE_HOST,
       username: config.CLICKHOUSE_USER,
@@ -82,7 +82,7 @@ describe('External API v2 Sources', () => {
     it('should return a single log source', async () => {
       const logSource = await createSourceFixture({
         kind: SourceKind.Log,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Test Log Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -118,7 +118,7 @@ describe('External API v2 Sources', () => {
     it('should return a single trace source', async () => {
       const traceSource = await createSourceFixture({
         kind: SourceKind.Trace,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Test Trace Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -260,7 +260,7 @@ describe('External API v2 Sources', () => {
     it('should return a single metric source', async () => {
       const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Test Metric Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -303,7 +303,7 @@ describe('External API v2 Sources', () => {
     it('should return a single session source', async () => {
       const traceSource = await createSourceFixture({
         kind: SourceKind.Trace,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Trace Source for Session',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -360,7 +360,7 @@ describe('External API v2 Sources', () => {
     it('should return multiple sources of different kinds', async () => {
       const logSource = await createSourceFixture({
         kind: SourceKind.Log,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Logs',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -373,7 +373,7 @@ describe('External API v2 Sources', () => {
 
       const traceSource = await createSourceFixture({
         kind: SourceKind.Trace,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Traces',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -393,7 +393,7 @@ describe('External API v2 Sources', () => {
 
       const metricSource = await createSourceFixture({
         kind: SourceKind.Metric,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Metrics',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -426,7 +426,7 @@ describe('External API v2 Sources', () => {
       // Create a source for the current team
       const currentTeamSource = await createSourceFixture({
         kind: SourceKind.Log,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Current Team Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -438,7 +438,7 @@ describe('External API v2 Sources', () => {
       });
 
       // Create another team and source
-      const otherTeamId = new mongoose.Types.ObjectId();
+      const otherTeamId = new ObjectId();
       const otherConnection = await createConnectionFixture({
         team: otherTeamId,
         name: 'Other Team Connection',
@@ -471,7 +471,7 @@ describe('External API v2 Sources', () => {
     it('should format sources according to SourceSchema', async () => {
       await createSourceFixture({
         kind: SourceKind.Log,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Test Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -502,7 +502,7 @@ describe('External API v2 Sources', () => {
       // Create a valid source
       const validSource = await createSourceFixture({
         kind: SourceKind.Log,
-        team: new mongoose.Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         name: 'Valid Source',
         from: {
           databaseName: DEFAULT_DATABASE,
@@ -545,7 +545,7 @@ describe('External API v2 Sources', () => {
       it('returns the section on a source that has one', async () => {
         const logSource = await createSourceFixture({
           kind: SourceKind.Log,
-          team: new mongoose.Types.ObjectId(team._id),
+          team: new ObjectId(team._id),
           name: 'Sectioned Log Source',
           section: SECTION,
           from: {
@@ -569,7 +569,7 @@ describe('External API v2 Sources', () => {
       it('omits the section on a source that has none', async () => {
         await createSourceFixture({
           kind: SourceKind.Log,
-          team: new mongoose.Types.ObjectId(team._id),
+          team: new ObjectId(team._id),
           name: 'Unsectioned Log Source',
           from: {
             databaseName: DEFAULT_DATABASE,

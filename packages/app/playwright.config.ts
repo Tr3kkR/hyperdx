@@ -41,7 +41,7 @@ export default defineConfig({
   })(),
   /* Use multiple workers on CI for faster execution. CI e2e shards run on
    * 8-core runners (see .github/workflows/e2e-tests.yml), so 4 workers leave
-   * headroom for the app + ClickHouse + Mongo. Override with E2E_WORKERS
+   * headroom for the app + ClickHouse. Override with E2E_WORKERS
    * (a positive integer); anything else falls back to the default. */
   workers: (() => {
     const raw = process.env.E2E_WORKERS;
@@ -95,8 +95,8 @@ export default defineConfig({
         // Full-stack mode: Start API and App servers (infrastructure started separately)
         {
           // Connections/sources come from env (injected by run-e2e.js from e2e-fixtures.json)
-          command: `cd ../api && ${process.env.MONGO_URI ? `MONGO_URI="${process.env.MONGO_URI}"` : ''} DOTENV_CONFIG_PATH=.env.e2e npx ts-node --transpile-only -r tsconfig-paths/register -r dotenv-expand/config -r @hyperdx/node-opentelemetry/build/src/tracing src/index.ts`,
-          port: parseInt(API_PORT, 10),
+          command: `cd ../api && SQLITE_PATH="${process.env.SQLITE_PATH || `./hyperdx-e2e-${process.env.HDX_E2E_SLOT || '0'}.db`}" DOTENV_CONFIG_PATH=.env.e2e npx ts-node --transpile-only -r tsconfig-paths/register -r dotenv-expand/config -r @hyperdx/node-opentelemetry/build/src/tracing src/index.ts`,
+          url: `http://localhost:${API_PORT}/ready`,
           reuseExistingServer: !process.env.CI,
           timeout: API_SERVER_STARTUP_TIMEOUT_MS,
           stdout: 'pipe',

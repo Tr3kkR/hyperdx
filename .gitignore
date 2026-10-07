@@ -93,6 +93,7 @@ scripts/*.csv
 # docker
 docker-compose.prod.yml
 .volumes
+packages/api/hyperdx-e2e-*.db*
 
 # NX
 .nx/

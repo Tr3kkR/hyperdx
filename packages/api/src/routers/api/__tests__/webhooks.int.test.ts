@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { ObjectId } from 'bson';
 
 import * as alertsRepo from '@/db/repos/alerts';
 import { getLoggedInAgent, getServer } from '@/fixtures';
@@ -115,6 +115,7 @@ describe('webhooks router', () => {
       service: MOCK_WEBHOOK.service,
       description: MOCK_WEBHOOK.description,
     });
+    expect(response.body.data).not.toHaveProperty('id');
 
     // Response should have masked URL and redacted headers
     expect(response.body.data.url).toBe('https://hooks.slack.com/****');
@@ -331,7 +332,7 @@ describe('webhooks router', () => {
   it('DELETE /:id - returns 200 when webhook does not exist', async () => {
     const { agent } = await getLoggedInAgent(server);
 
-    const nonExistentId = new Types.ObjectId().toString();
+    const nonExistentId = new ObjectId().toString();
 
     // This will succeed even if the ID doesn't exist, consistent with the implementation
     await agent.delete(`/webhooks/${nonExistentId}`).expect(200);
@@ -703,7 +704,7 @@ describe('webhooks router', () => {
     it('returns 404 when webhook does not exist', async () => {
       const { agent } = await getLoggedInAgent(server);
 
-      const nonExistentId = new Types.ObjectId().toString();
+      const nonExistentId = new ObjectId().toString();
 
       const response = await agent
         .put(`/webhooks/${nonExistentId}`)
@@ -1331,7 +1332,7 @@ describe('webhooks router', () => {
       expect(genericSpy).toHaveBeenCalledTimes(1);
       const sentWebhook = genericSpy.mock.calls[0][0].channel;
       expect(sentWebhook.url).toBe(realUrl);
-      expect(sentWebhook.headers.toJSON()).toEqual({
+      expect(sentWebhook.headers).toEqual({
         Authorization: 'Bearer real-secret',
       });
     });
@@ -1362,7 +1363,7 @@ describe('webhooks router', () => {
       // (NOT the stored real secret)
       const sentWebhook = genericSpy.mock.calls[0][0].channel;
       expect(sentWebhook.url).toBe('https://attacker.example.com/capture');
-      expect(sentWebhook.headers.toJSON()).toEqual({
+      expect(sentWebhook.headers).toEqual({
         Authorization: '****',
       });
     });
@@ -1404,7 +1405,7 @@ describe('webhooks router', () => {
         .send({
           service: WebhookService.Generic,
           url: 'https://example.com/****',
-          webhookId: new Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         })
         .expect(404);
 
@@ -1417,7 +1418,7 @@ describe('webhooks router', () => {
       const { agent } = await getLoggedInAgent(server);
 
       // Create a webhook belonging to a different team
-      const otherTeamId = new Types.ObjectId();
+      const otherTeamId = new ObjectId();
       const webhook = await createWebhookFixture({
         ...MOCK_WEBHOOK,
         service: WebhookService.Generic,

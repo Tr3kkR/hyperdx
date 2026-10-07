@@ -124,12 +124,8 @@ jobs:
           docker buildx bake -f ./docker-compose.ci.yml --set *.cache-to="type=gha,mode=max,scope=ci-integration" --set *.cache-from="type=gha,scope=ci-integration" --load
       - name: Build dependencies
         run: make ci-build
-      # Integration tests boot a MockServer on fixed ports and share a single
-      # MongoDB/ClickHouse database, so they must stay serial (--runInBand)
-      # within a runner. We shard ACROSS runners instead: each shard is its own
-      # VM with its own Docker stack, and jest's --shard splits the test files
-      # so the shards run in parallel. --shard is forwarded through nx (args
-      # after `--` reach the underlying jest invocations).
+      # Each Jest worker uses a separate SQLite file. CI also shards test files
+      # across runners; --shard is forwarded through nx to Jest.
       #
       # Runs inline (not `make ci-int`) so the compose project stays `hdx-ci`
       # (matching the bake step above); make ci-int's `-p int-<slot>` is local
@@ -140,7 +136,7 @@ jobs:
       - name: Run integration tests
         run: |
           docker compose -f ./docker-compose.ci.yml up -d --quiet-pull
-          npx nx run-many -t ci:int --parallel=false --output-style=stream -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+          npx nx run-many -t ci:int --output-style=stream -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
   # Stable aggregator context: `integration` is green only when all four shards
   # pass. Merge-queue / required-status checks target this single context, since
   # the per-shard contexts (Integration - Shard N) are not stable check names.

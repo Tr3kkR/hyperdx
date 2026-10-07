@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { getDb, withTransaction } from '@/db';
 import { normalizeId } from '@/db/ids';
 import * as users from '@/db/repos/users';
-import type { ObjectId } from '@/models';
+import type { ObjectId } from '@/models/ids';
 import logger from '@/utils/logger';
 export function findUserByAccessKey(accessKey: string) {
   return users.findByAccessKey(accessKey);

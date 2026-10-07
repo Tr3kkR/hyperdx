@@ -1,10 +1,10 @@
 import type { DashboardContainer } from '@hyperdx/common-utils/dist/types';
 import { uniq } from 'lodash';
-import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import * as config from '@/config';
 import { recordDashboardOnboardingIfHasTiles } from '@/controllers/dashboard';
+import { newId } from '@/db/ids';
 import type { DashboardInput } from '@/db/repos/dashboards';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import type { ToolRegistrar } from '@/mcp/tools/types';
@@ -134,7 +134,7 @@ function assignFilterIds(
   return filters.map(filter =>
     typeof filter.id === 'string' && filter.id.length > 0
       ? filter
-      : { ...filter, id: new mongoose.Types.ObjectId().toString() },
+      : { ...filter, id: newId() },
   );
 }
 

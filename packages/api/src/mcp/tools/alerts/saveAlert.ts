@@ -1,5 +1,4 @@
 import { AlertThresholdType } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 
 import * as config from '@/config';
 import {
@@ -117,10 +116,9 @@ export function registerSaveAlert({
       };
 
       // ── Validate referenced entities exist ──
-      const mongoTeamId = new mongoose.Types.ObjectId(teamId);
       let refs;
       try {
-        refs = await validateAlertInput(mongoTeamId, alertInput);
+        refs = await validateAlertInput(teamId, alertInput);
       } catch (e) {
         // BaseError subclasses (Api400Error, Api404Error, etc.) store the
         // descriptive message in `name` and a generic string in `message`.
@@ -133,16 +131,14 @@ export function registerSaveAlert({
         return e instanceof BaseError ? mcpUserError(msg) : mcpServerError(msg);
       }
 
-      const mongoUserId = new mongoose.Types.ObjectId(userId);
-
       // ── Update existing alert ──
       if (alertId) {
         const updated = await updateAlert(
           alertId,
-          mongoTeamId,
+          teamId,
           alertInput,
           refs,
-          mongoUserId,
+          userId,
         );
         if (!updated) {
           return mcpUserError('Alert not found');
@@ -168,9 +164,9 @@ export function registerSaveAlert({
 
       // ── Create new alert ──
       const created = await createAlert(
-        mongoTeamId,
+        teamId,
         alertInput as Parameters<typeof createAlert>[1],
-        mongoUserId,
+        userId,
         refs,
       );
       return {

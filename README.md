@@ -46,13 +46,18 @@ ClickHouse).
 ## Spinning Up HyperDX
 
 HyperDX can be deployed as part of ClickStack, which includes ClickHouse,
-HyperDX, OpenTelemetry Collector and MongoDB.
+HyperDX, OpenTelemetry Collector and a local SQLite metadata file.
 
 ```bash
-docker run -p 8080:8080 -p 4317:4317 -p 4318:4318 docker.hyperdx.io/hyperdx/hyperdx-all-in-one
+docker buildx bake --load
+docker run -p 8080:8080 -p 4317:4317 -p 4318:4318 \
+  -v hyperdx-data:/data hyperdx-all-in-one:sqlite
 ```
 
 Afterwards, you can visit http://localhost:8080 to access the HyperDX UI.
+
+For source builds, local development, and backup instructions, see
+[Build and run](./docs/BUILD-AND-RUN.md).
 
 If you already have an existing ClickHouse instance, want to use a single
 container locally, or are looking for production deployment instructions, you

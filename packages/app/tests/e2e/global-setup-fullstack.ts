@@ -2,13 +2,13 @@
  * Global setup for full-stack E2E tests
  *
  * This setup:
- * 1. Clears MongoDB database to ensure clean state
+ * 1. Clears SQLite tables to ensure clean state
  * 2. Creates a test user and team
  * 3. Applies DEFAULT_SOURCES from .env.e2e
  * 4. Saves authentication state for tests
  *
  * Full-stack mode uses:
- * - MongoDB (local) for authentication, teams, users, persistence
+ * - SQLite (local) for authentication, teams, users, persistence
  * - API server (local) for backend logic
  * - Demo ClickHouse (remote) for telemetry data (logs, traces, metrics, K8s)
  */
@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 import { chromium, FullConfig } from '@playwright/test';
 
-import { runMongoshScript } from './utils/db-helpers';
+import { runSqliteFixture } from './utils/db-helpers';
 import { seedClickHouse } from './seed-clickhouse';
 
 // Configuration constants
@@ -63,14 +63,14 @@ export const SEEDED_ERROR_ALERT = {
 };
 
 /**
- * Clears the MongoDB database to ensure a clean slate for tests
+ * Clears the SQLite database to ensure a clean slate for tests
  */
 function clearDatabase() {
-  console.log('Clearing MongoDB database for fresh test run...');
+  console.log('Clearing SQLite database for fresh test run...');
 
   try {
-    runMongoshScript("use('hyperdx-e2e'); db.dropDatabase();");
-    console.log('  ✓ Database cleared successfully (via Docker)');
+    runSqliteFixture('clear');
+    console.log('  ✓ Database cleared successfully');
   } catch (error) {
     console.warn('  ⚠ Warning: Could not clear database');
     console.warn(`  ${error instanceof Error ? error.message : String(error)}`);
@@ -85,7 +85,7 @@ function clearDatabase() {
 
 async function globalSetup(_config: FullConfig) {
   console.log('Setting up full-stack E2E environment');
-  console.log('  MongoDB: local (auth, teams, persistence)');
+  console.log('  SQLite: local (auth, teams, persistence)');
   console.log('  ClickHouse: local instance (telemetry data)');
 
   // Set timezone
@@ -138,7 +138,7 @@ async function globalSetup(_config: FullConfig) {
     );
   }
 
-  // Clear MongoDB database to ensure DEFAULT_SOURCES is applied
+  // Clear SQLite database to ensure DEFAULT_SOURCES is applied
   clearDatabase();
 
   // Create test user and save auth state
@@ -302,7 +302,7 @@ async function globalSetup(_config: FullConfig) {
  * Seeds an alert with a recorded execution error. The alert is created via the
  * API (so all referenced documents — saved search, webhook — exist and the
  * alerts list endpoint populates correctly), then the `errors` array is
- * patched in directly via mongosh since it's only ever set by the check-alerts
+ * patched in directly via SQLite since it's only ever set by the check-alerts
  * background job in normal operation.
  */
 async function seedAlertWithErrors(
@@ -379,62 +379,21 @@ async function seedAlertWithErrors(
   const alert = (await alertRes.json()).data;
   const alertId: string = alert._id ?? alert.id;
 
-  // 4) Patch the `executionErrors` array directly via mongosh. The
+  // 4) Patch the `executionErrors` array directly via SQLite. The
   // check-alerts job is the only code that writes this field in normal
   // operation, so we write it here to avoid having to run that job during
   // setup.
   // Evaluation windows aligned to the alert's 5m interval: one OK window
   // followed by an ERROR window (a failed evaluation), so the alerts page
   // history strip and the alert detail page have data to render.
-  const windowMs = 5 * 60 * 1000;
-  const errorWindowStart = Math.floor(Date.now() / windowMs) * windowMs;
-  const okWindowStart = errorWindowStart - windowMs;
-
-  const patchScript = `
-use('hyperdx-e2e');
-db.alerts.updateOne(
-  { _id: ObjectId(${JSON.stringify(alertId)}) },
-  {
-    $set: {
-      executionErrors: [
-        {
-          timestamp: new Date(),
-          type: ${JSON.stringify(SEEDED_ERROR_ALERT.errorType)},
-          message: ${JSON.stringify(SEEDED_ERROR_ALERT.errorMessage)}
-        }
-      ],
-      state: 'OK'
-    }
-  }
-);
-db.alerthistories.deleteMany({ alert: ObjectId(${JSON.stringify(alertId)}) });
-db.alerthistories.insertMany([
-  {
-    alert: ObjectId(${JSON.stringify(alertId)}),
-    createdAt: new Date(${okWindowStart}),
-    state: 'OK',
-    counts: 0,
-    lastValues: [{ startTime: new Date(${okWindowStart - windowMs}), count: 0 }]
-  },
-  {
-    alert: ObjectId(${JSON.stringify(alertId)}),
-    createdAt: new Date(${errorWindowStart}),
-    state: 'ERROR',
-    counts: 0,
-    lastValues: [],
-    errors: [
-      {
-        timestamp: new Date(),
-        type: ${JSON.stringify(SEEDED_ERROR_ALERT.historyErrorType)},
-        message: ${JSON.stringify(SEEDED_ERROR_ALERT.historyErrorMessage)}
-      }
-    ]
-  }
-]);
-`;
-
   try {
-    runMongoshScript(patchScript);
+    runSqliteFixture('alert-errors', {
+      id: alertId,
+      errorType: SEEDED_ERROR_ALERT.errorType,
+      errorMessage: SEEDED_ERROR_ALERT.errorMessage,
+      historyErrorType: SEEDED_ERROR_ALERT.historyErrorType,
+      historyErrorMessage: SEEDED_ERROR_ALERT.historyErrorMessage,
+    });
     console.log(
       `  ✓ Seeded alert "${alert.name}" (${alertId}) with a ${SEEDED_ERROR_ALERT.errorType}`,
     );

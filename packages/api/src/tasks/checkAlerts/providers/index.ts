@@ -7,10 +7,10 @@ import {
 import _ from 'lodash';
 
 import type { SavedSearchDoc } from '@/db/repos/savedSearches';
-import { ObjectId } from '@/models';
 import { IAlert, IAlertError } from '@/models/alert';
 import { IAlertHistory, IAlertHistoryAnalytics } from '@/models/alertHistory';
 import { IDashboard } from '@/models/dashboard';
+import { ObjectId } from '@/models/ids';
 import { ISavedSearch } from '@/models/savedSearch';
 
 export type SavedSearchLike = Omit<ISavedSearch, 'source'> | SavedSearchDoc;

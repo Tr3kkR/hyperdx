@@ -1,5 +1,5 @@
 import { DisplayType } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import { createAlert } from '@/controllers/alerts';
 import { createTeam } from '@/controllers/team';
@@ -114,10 +114,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const result = await provider.getAlertTasks();
@@ -184,10 +184,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const result = await provider.getAlertTasks();
@@ -228,13 +228,13 @@ describe('DefaultAlertProvider', () => {
       await createAlertFixture({
         team: team._id,
         source: AlertSource.SAVED_SEARCH,
-        savedSearch: new mongoose.Types.ObjectId(), // Non-existent ID
+        savedSearch: new ObjectId().toString(), // Non-existent ID
         threshold: 10,
         thresholdType: AlertThresholdType.ABOVE,
         interval: '5m',
         channel: {
           type: 'webhook',
-          webhookId: new mongoose.Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         },
       });
 
@@ -253,7 +253,7 @@ describe('DefaultAlertProvider', () => {
         interval: '5m',
         channel: {
           type: 'webhook',
-          webhookId: new mongoose.Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         },
         // Missing source field
       });
@@ -309,10 +309,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       // Create tile and alert
@@ -338,10 +338,10 @@ describe('DefaultAlertProvider', () => {
           interval: '15m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const result = await provider.getAlertTasks();
@@ -432,10 +432,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       await createAlert(
@@ -448,10 +448,10 @@ describe('DefaultAlertProvider', () => {
           interval: '15m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const result = await provider.getAlertTasks();
@@ -474,14 +474,14 @@ describe('DefaultAlertProvider', () => {
       await createAlertFixture({
         team: team._id,
         source: AlertSource.TILE,
-        dashboard: new mongoose.Types.ObjectId(), // Non-existent ID
+        dashboard: new ObjectId().toString(), // Non-existent ID
         tileId: 'some-tile-id',
         threshold: 10,
         thresholdType: AlertThresholdType.ABOVE,
         interval: '5m',
         channel: {
           type: 'webhook',
-          webhookId: new mongoose.Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         },
       });
 
@@ -509,7 +509,7 @@ describe('DefaultAlertProvider', () => {
         interval: '5m',
         channel: {
           type: 'webhook',
-          webhookId: new mongoose.Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         },
       });
 
@@ -522,7 +522,7 @@ describe('DefaultAlertProvider', () => {
 
       const tile = makeTile({
         id: 'test-tile',
-        sourceId: new mongoose.Types.ObjectId().toString(), // Non-existent source
+        sourceId: new ObjectId().toString(), // Non-existent source
       });
 
       const dashboard = await createDashboardFixture({
@@ -542,7 +542,7 @@ describe('DefaultAlertProvider', () => {
         interval: '5m',
         channel: {
           type: 'webhook',
-          webhookId: new mongoose.Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         },
       });
 
@@ -563,7 +563,7 @@ describe('DefaultAlertProvider', () => {
           tableName: 'logs',
         },
         timestampValueExpression: 'timestamp',
-        connection: new mongoose.Types.ObjectId(), // Non-existent connection
+        connection: new ObjectId().toString(), // Non-existent connection
       });
 
       const savedSearch = await createSavedSearchFixture({
@@ -587,7 +587,7 @@ describe('DefaultAlertProvider', () => {
         interval: '5m',
         channel: {
           type: 'webhook',
-          webhookId: new mongoose.Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         },
       });
 
@@ -607,7 +607,7 @@ describe('DefaultAlertProvider', () => {
         interval: '5m',
         channel: {
           type: 'webhook',
-          webhookId: new mongoose.Types.ObjectId().toString(),
+          webhookId: new ObjectId().toString(),
         },
       });
 
@@ -663,10 +663,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const result = await provider.getAlertTasks();
@@ -727,10 +727,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const result = await provider.getAlertTasks();
@@ -778,10 +778,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const result = await provider.getAlertTasks();
@@ -856,10 +856,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       let result = await provider.getAlertTasks();
@@ -916,10 +916,10 @@ describe('DefaultAlertProvider', () => {
           interval: '5m',
           channel: {
             type: 'webhook',
-            webhookId: new mongoose.Types.ObjectId().toString(),
+            webhookId: new ObjectId().toString(),
           },
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       let result = await provider.getAlertTasks();
@@ -956,8 +956,8 @@ describe('DefaultAlertProvider', () => {
     it('should handle different saved search IDs', () => {
       const customSavedSearch: any = {
         id: 'custom-search-123',
-        team: new mongoose.Types.ObjectId(),
-        source: new mongoose.Types.ObjectId(),
+        team: new ObjectId().toString(),
+        source: new ObjectId().toString(),
         select: 'Body',
         where: 'Body: "error"',
         whereLanguage: 'lucene',
@@ -1021,8 +1021,8 @@ describe('DefaultAlertProvider', () => {
     it('should handle saved search ID with special characters', () => {
       const specialSavedSearch: any = {
         id: 'search-with-special-chars-123_456',
-        team: new mongoose.Types.ObjectId(),
-        source: new mongoose.Types.ObjectId(),
+        team: new ObjectId().toString(),
+        source: new ObjectId().toString(),
         select: 'Body',
         where: 'Body: "error"',
         whereLanguage: 'lucene',

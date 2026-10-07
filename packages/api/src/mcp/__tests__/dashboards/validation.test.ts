@@ -1,5 +1,5 @@
 import { DASHBOARD_VARIABLE_NAME_MAX_LENGTH } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import {
   mcpFiltersParam,
@@ -18,8 +18,8 @@ import type {
   ExternalQueryExpressionFilterWithId,
 } from '@/utils/zod';
 
-const connectionId = new mongoose.Types.ObjectId().toString();
-const sourceId = new mongoose.Types.ObjectId().toString();
+const connectionId = new ObjectId().toString();
+const sourceId = new ObjectId().toString();
 
 describe('metric tile schema', () => {
   it('accepts exponential histograms and defaults their value expression', () => {
@@ -126,7 +126,7 @@ describe('tile-level where rejection (builder tiles)', () => {
 
   it('rejects a tile-level where on the patch schema too', () => {
     const result = mcpPatchDashboardSchema.safeParse({
-      dashboardId: new mongoose.Types.ObjectId().toString(),
+      dashboardId: new ObjectId().toString(),
       tileId: 'tile-1',
       tile: {
         config: {
@@ -451,7 +451,7 @@ function makeFilter(
   overrides: Partial<ExternalQueryExpressionFilterWithId> = {},
 ): ExternalQueryExpressionFilterWithId {
   return {
-    id: new mongoose.Types.ObjectId().toString(),
+    id: new ObjectId().toString(),
     type: 'QUERY_EXPRESSION',
     name: 'Service',
     expression: 'ServiceName',

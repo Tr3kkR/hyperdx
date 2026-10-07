@@ -152,13 +152,8 @@ export const handleSendGenericWebhook = async (
   }
 };
 
-// `webhook.headers` is a Mongoose map; `.toJSON()` types as a plain object or
-// a `Map` depending on how it's called (see IWebhook), and the schema
-// restricts values to strings, but nothing enforces that at the type level.
-// Narrow explicitly instead of asserting so a stray non-string value is
-// dropped rather than sent as `[object Object]`. A real `Map` yields no
-// entries here, matching how `Object.entries`/spread already treat one (its
-// data lives outside its own enumerable properties).
+// Narrow values explicitly so a stray non-string value is dropped rather
+// than sent as `[object Object]`.
 const toStringHeaderRecord = (value: unknown): Record<string, string> => {
   if (!value || typeof value !== 'object') {
     return {};
@@ -171,11 +166,8 @@ const toStringHeaderRecord = (value: unknown): Record<string, string> => {
 };
 
 const webhookMapValues = (
-  value: Record<string, string> | { toJSON(): unknown } | undefined,
-): Record<string, string> =>
-  toStringHeaderRecord(
-    value && typeof value.toJSON === 'function' ? value.toJSON() : value,
-  );
+  value: Record<string, string> | undefined,
+): Record<string, string> => toStringHeaderRecord(value);
 
 const sendGenericWebhook = async (
   webhook: IWebhook,

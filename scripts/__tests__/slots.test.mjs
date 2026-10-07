@@ -32,7 +32,7 @@ const pick = output =>
     output
       .trim()
       .split('\n')
-      .filter(line => /^(HDX_|HYPERDX_|E2E_PROJECT=)/.test(line))
+      .filter(line => /^(HDX_|HYPERDX_|E2E_PROJECT=|SQLITE_PATH=)/.test(line))
       .map(line => line.split('=')),
   );
 
@@ -56,7 +56,6 @@ test('exports the dev stack ports', () => {
     HYPERDX_API_PORT: '30144',
     HYPERDX_APP_PORT: '30244',
     HYPERDX_OPAMP_PORT: '30344',
-    HDX_DEV_MONGO_PORT: '30444',
     HDX_DEV_CH_HTTP_PORT: '30544',
     HDX_DEV_CH_NATIVE_PORT: '30644',
     HDX_DEV_OTEL_HEALTH_PORT: '30744',
@@ -65,6 +64,7 @@ test('exports the dev stack ports', () => {
     HDX_DEV_OTEL_METRICS_PORT: '31044',
     HDX_DEV_OTEL_JSON_HTTP_PORT: '31144',
     HDX_DEV_PROJECT: 'hdx-dev-44',
+    SQLITE_PATH: path.join(fs.realpathSync(hyperdxEe), '.volumes/hyperdx_dev_44.db'),
   });
 });
 
@@ -72,7 +72,7 @@ test('exports the integration test ports', () => {
   assert.deepEqual(ports('hdx_ci_ports', { cwd: hyperdxEe }), {
     HDX_CI_SLOT: '44',
     HDX_CI_CH_PORT: '18167',
-    HDX_CI_MONGO_PORT: '40043',
+    HDX_CI_CH_PORT_2: '18267',
     HDX_CI_API_PORT: '19044',
     HDX_CI_OPAMP_PORT: '14364',
     HDX_CI_PROJECT: 'int-44',
@@ -86,11 +86,11 @@ test('exports the E2E test ports', () => {
     HDX_E2E_CH_PORT: '20544',
     HDX_E2E_CH_NATIVE_PORT: '20644',
     HDX_E2E_API_PORT: '21044',
-    HDX_E2E_MONGO_PORT: '21144',
     HDX_E2E_APP_LOCAL_PORT: '21244',
     HDX_E2E_APP_PORT: '21344',
     HDX_E2E_REPORT_PORT: '9367',
     E2E_PROJECT: 'e2e-44',
+    SQLITE_PATH: path.join(fs.realpathSync(hyperdxEe), 'packages/api/hyperdx-e2e-44.db'),
   });
 });
 

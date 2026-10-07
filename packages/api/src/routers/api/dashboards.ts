@@ -33,7 +33,7 @@ import {
 } from '@/controllers/presetDashboardFilters';
 import { getSources } from '@/controllers/sources';
 import { getNonNullUserWithTeam } from '@/middleware/auth';
-import type { ObjectId } from '@/models';
+import type { ObjectId } from '@/models/ids';
 import { getPromqlLabelFilterSourceError } from '@/routers/external-api/v2/utils/dashboards';
 import { objectIdSchema } from '@/utils/zod';
 

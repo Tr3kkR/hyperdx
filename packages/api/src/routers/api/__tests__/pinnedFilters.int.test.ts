@@ -1,5 +1,5 @@
 import { SourceKind, TSource } from '@hyperdx/common-utils/dist/types';
-import { Types } from 'mongoose';
+import { ObjectId } from 'bson';
 
 import { getLoggedInAgent, getServer } from '@/fixtures';
 import { createSourceFixture } from '@/test/sqliteMetadata';
@@ -7,7 +7,7 @@ import { createSourceFixture } from '@/test/sqliteMetadata';
 const MOCK_SOURCE: Omit<Extract<TSource, { kind: 'log' }>, 'id'> = {
   kind: SourceKind.Log,
   name: 'Test Source',
-  connection: new Types.ObjectId().toString(),
+  connection: new ObjectId().toString(),
   from: { databaseName: 'test_db', tableName: 'test_table' },
   timestampValueExpression: 'timestamp',
   defaultTableSelectExpression: 'body',
@@ -62,7 +62,7 @@ describe('pinnedFilters router', () => {
     });
 
     it('returns 404 for a source not owned by the team', async () => {
-      const foreignSourceId = new Types.ObjectId().toString();
+      const foreignSourceId = new ObjectId().toString();
       await agent.get(`/pinned-filters?source=${foreignSourceId}`).expect(404);
     });
   });
@@ -117,7 +117,7 @@ describe('pinnedFilters router', () => {
     });
 
     it('returns 404 for a source not owned by the team', async () => {
-      const foreignSourceId = new Types.ObjectId().toString();
+      const foreignSourceId = new ObjectId().toString();
       await agent
         .put('/pinned-filters')
         .send({ source: foreignSourceId, fields: [], filters: {} })

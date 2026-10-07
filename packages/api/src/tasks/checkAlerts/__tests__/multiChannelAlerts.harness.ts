@@ -4,13 +4,13 @@ import ms from 'ms';
 import * as config from '@/config';
 import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import { bulkInsertLogs } from '@/fixtures';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook from '@/models/webhook';
 import { processAlert } from '@/tasks/checkAlerts';
 import { AlertTaskType } from '@/tasks/checkAlerts/providers';
 import {
   createConnectionFixture,
+  createSavedSearchFixture,
   createSourceFixture,
+  createWebhookFixture,
   findAlertFixture,
 } from '@/test/sqliteMetadata';
 
@@ -62,7 +62,7 @@ export const setupAlertFixtures = async (
     connection: connection.id,
     name: 'Test Logs',
   });
-  const savedSearch = await new SavedSearch({
+  const savedSearch = createSavedSearchFixture({
     team: team._id,
     name: 'Error Logs Search',
     select: 'Body',
@@ -71,18 +71,18 @@ export const setupAlertFixtures = async (
     orderBy: 'Timestamp',
     source: source.id,
     tags: ['test'],
-  }).save();
+  });
   return { team, connection, source, savedSearch };
 };
 
 export const makeGenericWebhook = (teamId: any, name: string, url: string) =>
-  new Webhook({
+  createWebhookFixture({
     team: teamId,
     service: 'generic',
     url,
     name,
     body: JSON.stringify({ text: '{{title}}' }),
-  }).save();
+  });
 
 export const seedTriggeringLogs = async () => {
   const eventTime = new Date(NOW.getTime() - ms('3m'));

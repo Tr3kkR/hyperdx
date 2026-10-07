@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import { getSource } from '@/controllers/sources';
 import { clearDBCollections, closeDB, connectDB } from '@/fixtures';
@@ -22,7 +22,7 @@ describe('sources controller', () => {
       // through MCP tools as "Cast to ObjectId failed for value ...".
       // The wrapper now short-circuits before hitting MongoDB so the
       // caller's not-found branch fires cleanly.
-      const team = new mongoose.Types.ObjectId().toString();
+      const team = new ObjectId().toString();
 
       expect(await getSource(team, 'not-an-objectid')).toBeNull();
       expect(await getSource(team, '')).toBeNull();
@@ -30,8 +30,8 @@ describe('sources controller', () => {
     });
 
     it('returns null for a well-formed but missing ObjectId', async () => {
-      const team = new mongoose.Types.ObjectId().toString();
-      const missingSourceId = new mongoose.Types.ObjectId().toString();
+      const team = new ObjectId().toString();
+      const missingSourceId = new ObjectId().toString();
 
       expect(await getSource(team, missingSourceId)).toBeNull();
     });

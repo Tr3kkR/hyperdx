@@ -13,7 +13,6 @@ import {
   SavedChartConfig,
   Tile,
 } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 import ms from 'ms';
 import request from 'supertest';
 
@@ -24,7 +23,6 @@ import { findUserByEmail } from '@/controllers/user';
 import { closeDb, getDb, openDb } from '@/db';
 import { newId } from '@/db/ids';
 import { migrate } from '@/db/migrate';
-import { mongooseConnection } from '@/models';
 import { AlertInterval, AlertSource } from '@/models/alert';
 import Server from '@/server';
 import logger from '@/utils/logger';
@@ -151,10 +149,6 @@ export const connectDB = async () => {
   if (!config.IS_CI) {
     throw new Error('ONLY execute this in CI env 😈 !!!');
   }
-  if (config.MONGO_URI == null) {
-    throw new Error('MONGO_URI is not set');
-  }
-  await mongoose.connect(config.MONGO_URI);
   openTestDb();
 };
 
@@ -162,8 +156,6 @@ export const closeDB = async () => {
   if (!config.IS_CI) {
     throw new Error('ONLY execute this in CI env 😈 !!!');
   }
-  await mongooseConnection.dropDatabase();
-  await mongoose.disconnect();
   closeDb();
   for (const suffix of ['', '-wal', '-shm']) {
     try {
@@ -178,12 +170,6 @@ export const clearDBCollections = async () => {
   if (!config.IS_CI) {
     throw new Error('ONLY execute this in CI env 😈 !!!');
   }
-  const collections = mongooseConnection.collections;
-  await Promise.all(
-    Object.values(collections).map(async collection => {
-      await collection.deleteMany({}); // an empty mongodb selector object ({}) must be passed as the filter argument
-    }),
-  );
   const db = getDb();
   const tables = db
     .prepare(
@@ -729,7 +715,7 @@ export function buildMetricSeries({
   }));
 }
 
-export const randomMongoId = () => new mongoose.Types.ObjectId().toHexString();
+export const randomMongoId = newId;
 
 export const makeTile = (opts?: {
   id?: string;

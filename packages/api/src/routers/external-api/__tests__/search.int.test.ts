@@ -1,5 +1,5 @@
 import { SourceKind } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 import request from 'supertest';
 
 import * as config from '@/config';
@@ -534,7 +534,7 @@ describe('External API v2 Search', () => {
     // The /register/password endpoint only allows one team to register, so
     // create a synthetic "other team" source directly in Mongo and verify
     // the authenticated user (team 1) cannot access it.
-    const otherTeamId = new mongoose.Types.ObjectId();
+    const otherTeamId = new ObjectId();
     const otherConnection = await createConnectionFixture({
       team: otherTeamId,
       name: 'Other Team Connection',

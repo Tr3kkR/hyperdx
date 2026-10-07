@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import {
   resolveDashboardVariables,
@@ -6,13 +6,13 @@ import {
 } from '@/mcp/tools/dashboards/variables';
 import type { ExternalDashboardFilterWithId } from '@/utils/zod';
 
-const sourceId = new mongoose.Types.ObjectId().toString();
+const sourceId = new ObjectId().toString();
 
 function filter(
   overrides: Partial<ExternalDashboardFilterWithId> = {},
 ): ExternalDashboardFilterWithId {
   return {
-    id: new mongoose.Types.ObjectId().toString(),
+    id: new ObjectId().toString(),
     type: 'QUERY_EXPRESSION',
     name: 'Service',
     expression: 'ServiceName',
@@ -34,7 +34,7 @@ function staticFilter(
   > = {},
 ): ExternalDashboardFilterWithId {
   return {
-    id: new mongoose.Types.ObjectId().toString(),
+    id: new ObjectId().toString(),
     type: 'STATIC_LIST',
     name: 'Environment',
     options: ['prod', 'staging', 'dev'],

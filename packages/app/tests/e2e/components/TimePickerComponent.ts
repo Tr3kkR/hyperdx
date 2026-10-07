@@ -144,20 +144,19 @@ export class TimePickerComponent {
    * state changes (re-opening the popover between attempts if it closed).
    */
   async toggleRelativeTimeSwitch() {
-    await this.relativeTimeSwitch.waitFor({ state: 'attached', timeout: 5000 });
-    const before = await this.relativeTimeSwitch.isChecked();
+    const before = await this.isRelativeTimeEnabled();
     const track = this.relativeTimeSwitch.locator('..');
     for (let attempt = 0; attempt < 4; attempt++) {
-      await track.click({ timeout: 5000 });
+      if ((await this.isRelativeTimeEnabled()) !== before) return;
       try {
+        await track.click({ timeout: 5000 });
         await expect(this.relativeTimeSwitch).toBeChecked({
           checked: !before,
           timeout: 2000,
         });
         return;
       } catch {
-        // Click didn't register (popover re-render); ensure it's open and retry.
-        await this.open();
+        // Live-tail refresh may close the popover during the click or assertion.
       }
     }
     await expect(this.relativeTimeSwitch).toBeChecked({ checked: !before });
@@ -172,8 +171,17 @@ export class TimePickerComponent {
    * test timeout.
    */
   async isRelativeTimeEnabled(): Promise<boolean> {
-    await this.relativeTimeSwitch.waitFor({ state: 'attached', timeout: 5000 });
-    return await this.relativeTimeSwitch.isChecked();
+    // Live-tail URL updates can close the popover after a previous action.
+    // Reopen it before reading the switch, which only exists while open.
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await this.open();
+      try {
+        return await this.relativeTimeSwitch.isChecked({ timeout: 2000 });
+      } catch {
+        // A live-tail refresh detached the switch; reopen and read again.
+      }
+    }
+    throw new Error('Relative time switch did not remain available');
   }
 
   /**
@@ -240,6 +248,7 @@ export class TimePickerComponent {
   async selectRelativeTime(timeRange: string) {
     await this.open();
     await this.selectTimeInterval(timeRange);
+    await this.pickerPopover.waitFor({ state: 'hidden', timeout: 5000 });
   }
 
   /**

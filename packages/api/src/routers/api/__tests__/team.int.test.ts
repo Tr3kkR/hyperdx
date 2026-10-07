@@ -1,6 +1,5 @@
+import { ObjectId } from 'bson';
 import _ from 'lodash';
-import { ObjectId } from 'mongodb';
-import mongoose from 'mongoose';
 
 import * as teamInvites from '@/db/repos/teamInvites';
 import * as teams from '@/db/repos/teams';
@@ -89,27 +88,27 @@ describe('team router', () => {
     await createAlertFixture({
       team: team.id,
       source: AlertSource.SAVED_SEARCH,
-      savedSearch: new mongoose.Types.ObjectId(),
+      savedSearch: new ObjectId(),
       threshold: 10,
       thresholdType: AlertThresholdType.ABOVE,
       interval: '5m',
       channel: {
         type: 'webhook',
-        webhookId: new mongoose.Types.ObjectId().toString(),
+        webhookId: new ObjectId().toString(),
       },
       tags: ['test2', 'test3'],
     });
 
     await createAlertFixture({
-      team: new mongoose.Types.ObjectId(),
+      team: new ObjectId(),
       source: AlertSource.SAVED_SEARCH,
-      savedSearch: new mongoose.Types.ObjectId(),
+      savedSearch: new ObjectId(),
       threshold: 10,
       thresholdType: AlertThresholdType.ABOVE,
       interval: '5m',
       channel: {
         type: 'webhook',
-        webhookId: new mongoose.Types.ObjectId().toString(),
+        webhookId: new ObjectId().toString(),
       },
       tags: ['other-team'],
     });
@@ -325,27 +324,27 @@ describe('team router', () => {
       createdBy: user1._id,
       team: team.id,
       source: AlertSource.SAVED_SEARCH,
-      savedSearch: new mongoose.Types.ObjectId(),
+      savedSearch: new ObjectId(),
       threshold: 10,
       thresholdType: AlertThresholdType.ABOVE,
       interval: '5m',
       channel: {
         type: 'webhook',
-        webhookId: new mongoose.Types.ObjectId().toString(),
+        webhookId: new ObjectId().toString(),
       },
     });
 
     const alertInAnotherTeam = await createAlertFixture({
       createdBy: user1._id,
-      team: new mongoose.Types.ObjectId(), // Different team ID
+      team: new ObjectId(), // Different team ID
       source: AlertSource.SAVED_SEARCH,
-      savedSearch: new mongoose.Types.ObjectId(),
+      savedSearch: new ObjectId(),
       threshold: 10,
       thresholdType: AlertThresholdType.ABOVE,
       interval: '5m',
       channel: {
         type: 'webhook',
-        webhookId: new mongoose.Types.ObjectId().toString(),
+        webhookId: new ObjectId().toString(),
       },
     });
 

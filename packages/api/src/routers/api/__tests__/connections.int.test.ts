@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId } from 'bson';
 
 import * as config from '@/config';
 import * as connections from '@/db/repos/connections';

@@ -12,16 +12,16 @@ include .env
 # ---------------------------------------------------------------------------
 # One shell for all six values: this runs on every make invocation, and each
 # shell costs ~20ms.
-_hdx_ci := $(shell HDX_CI_SLOT='$(HDX_CI_SLOT)' sh -c '. ./scripts/slots.sh && hdx_ci_ports && echo "$$HDX_CI_SLOT $$HDX_CI_PROJECT $$HDX_CI_CH_PORT $$HDX_CI_MONGO_PORT $$HDX_CI_API_PORT $$HDX_CI_OPAMP_PORT"')
+_hdx_ci := $(shell HDX_CI_SLOT='$(HDX_CI_SLOT)' sh -c '. ./scripts/slots.sh && hdx_ci_ports && echo "$$HDX_CI_SLOT $$HDX_CI_PROJECT $$HDX_CI_CH_PORT $$HDX_CI_CH_PORT_2 $$HDX_CI_API_PORT $$HDX_CI_OPAMP_PORT"')
 
 HDX_CI_SLOT      := $(word 1,$(_hdx_ci))
 HDX_CI_PROJECT   := $(word 2,$(_hdx_ci))
 HDX_CI_CH_PORT   := $(word 3,$(_hdx_ci))
-HDX_CI_MONGO_PORT:= $(word 4,$(_hdx_ci))
+HDX_CI_CH_PORT_2 := $(word 4,$(_hdx_ci))
 HDX_CI_API_PORT  := $(word 5,$(_hdx_ci))
 HDX_CI_OPAMP_PORT:= $(word 6,$(_hdx_ci))
 
-export HDX_CI_CH_PORT HDX_CI_MONGO_PORT HDX_CI_API_PORT HDX_CI_OPAMP_PORT
+export HDX_CI_CH_PORT HDX_CI_CH_PORT_2 HDX_CI_API_PORT HDX_CI_OPAMP_PORT
 
 # Log directory for dev-portal visibility (integration tests)
 HDX_CI_LOGS_DIR := $(HOME)/.config/hyperdx/dev-slots/$(HDX_CI_SLOT)/logs-int
@@ -155,7 +155,7 @@ dev-int-build:
 
 .PHONY: dev-int
 dev-int:
-	@echo "Using CI slot $(HDX_CI_SLOT) (project=$(HDX_CI_PROJECT) ch=$(HDX_CI_CH_PORT) mongo=$(HDX_CI_MONGO_PORT) api=$(HDX_CI_API_PORT))"
+	@echo "Using CI slot $(HDX_CI_SLOT) (project=$(HDX_CI_PROJECT) ch=$(HDX_CI_CH_PORT),$(HDX_CI_CH_PORT_2) api=$(HDX_CI_API_PORT))"
 	@mkdir -p $(HDX_CI_LOGS_DIR)
 	@bash scripts/ensure-dev-portal.sh
 	docker compose -p $(HDX_CI_PROJECT) -f ./docker-compose.ci.yml up -d
@@ -166,7 +166,7 @@ dev-int:
 
 .PHONY: dev-int-common-utils
 dev-int-common-utils:
-	@echo "Using CI slot $(HDX_CI_SLOT) (project=$(HDX_CI_PROJECT) ch=$(HDX_CI_CH_PORT) mongo=$(HDX_CI_MONGO_PORT))"
+	@echo "Using CI slot $(HDX_CI_SLOT) (project=$(HDX_CI_PROJECT) ch=$(HDX_CI_CH_PORT),$(HDX_CI_CH_PORT_2))"
 	@mkdir -p $(HDX_CI_LOGS_DIR)
 	@bash scripts/ensure-dev-portal.sh
 	docker compose -p $(HDX_CI_PROJECT) -f ./docker-compose.ci.yml up -d
@@ -228,11 +228,8 @@ dev-e2e:
 
 
 
-# TODO: check db connections before running the migration CLIs
 .PHONY: dev-migrate-db
 dev-migrate-db:
-	@echo "Migrating Mongo db...\n"
-	npx nx run @hyperdx/api:dev:migrate-db
 	@echo "Migrating ClickHouse db...\n"
 	npx nx run @hyperdx/api:dev:migrate-ch
 
@@ -327,4 +324,3 @@ build-all-in-one-nightly:
 		-t ${ALL_IN_ONE_IMAGE_NAME_DOCKERHUB}:${IMAGE_NIGHTLY_TAG} \
 		-t ${NEXT_ALL_IN_ONE_IMAGE_NAME_DOCKERHUB}:${IMAGE_NIGHTLY_TAG} \
 		--target all-in-one-auth
-

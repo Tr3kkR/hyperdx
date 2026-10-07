@@ -23,14 +23,14 @@ yarn dev        # or equivalently: make dev
   Always scope it with `--mutate`; a whole-package run takes tens of minutes.
   See [CONTRIBUTING.md](../CONTRIBUTING.md#mutation-tests)
 - `yarn seed:alerts --count N` (in `packages/api`): Fill this worktree's
-  dev-slot Mongo with N alerts for testing the alerts page at scale: half on
+  dev-slot SQLite file with N alerts for testing the alerts page at scale: half on
   saved searches, half on dashboard tiles. Seeded dashboards and saved searches
   are tagged `seeded`; `yarn seed:alerts --purge` removes them.
 
 ## Environment Configuration
 
 - `.env.development`: Development environment variables
-- Docker Compose manages ClickHouse, MongoDB, OTel Collector
+- Docker Compose manages ClickHouse and OTel Collector; SQLite is local
 - Hot reload enabled for all services in development
 
 ## Worktree Isolation (Multi-Agent / Multi-Developer)
@@ -59,7 +59,6 @@ integration tests (14320-40098) and E2E tests (20320-21399).
 | API server        | 30100     | 30100 - 30199 | `HYPERDX_API_PORT`            |
 | App (Next.js)     | 30200     | 30200 - 30299 | `HYPERDX_APP_PORT`            |
 | OpAMP             | 30300     | 30300 - 30399 | `HYPERDX_OPAMP_PORT`          |
-| MongoDB           | 30400     | 30400 - 30499 | `HDX_DEV_MONGO_PORT`          |
 | ClickHouse HTTP   | 30500     | 30500 - 30599 | `HDX_DEV_CH_HTTP_PORT`        |
 | ClickHouse Native | 30600     | 30600 - 30699 | `HDX_DEV_CH_NATIVE_PORT`      |
 | OTel health       | 30700     | 30700 - 30799 | `HDX_DEV_OTEL_HEALTH_PORT`    |
@@ -173,7 +172,7 @@ Port mapping (base + slot):
 | Service         | Default port (slot 0) | Variable          |
 | --------------- | --------------------- | ----------------- |
 | ClickHouse HTTP | 18123                 | HDX_CI_CH_PORT    |
-| MongoDB         | 39999                 | HDX_CI_MONGO_PORT |
+| ClickHouse worker 2 | 18223              | HDX_CI_CH_PORT_2 |
 | API test server | 19000                 | HDX_CI_API_PORT   |
 | OpAMP           | 14320                 | HDX_CI_OPAMP_PORT |
 
@@ -181,7 +180,7 @@ Port mapping (base + slot):
 
 - Uses separate Docker Compose configuration (`docker-compose.ci.yml`)
 - Isolated test environment with unique `-p int-<slot>` project name
-- Includes all necessary services (ClickHouse, MongoDB, OTel Collector)
+- Includes two ClickHouse/collector pairs; workers use separate SQLite files
 - Tests run against real database instances for accurate integration testing
 
 ### E2E Testing
@@ -198,7 +197,6 @@ E2E port mapping (base + slot):
 | ClickHouse HTTP   | 20500     | 20500 - 20599 | `HDX_E2E_CH_PORT`        |
 | ClickHouse Native | 20600     | 20600 - 20699 | `HDX_E2E_CH_NATIVE_PORT` |
 | API server        | 21000     | 21000 - 21099 | `HDX_E2E_API_PORT`       |
-| MongoDB           | 21100     | 21100 - 21199 | `HDX_E2E_MONGO_PORT`     |
 | App (local)       | 21200     | 21200 - 21299 | `HDX_E2E_APP_LOCAL_PORT` |
 | App (fullstack)   | 21300     | 21300 - 21399 | `HDX_E2E_APP_PORT`       |
 
@@ -239,7 +237,7 @@ does not overlap with CI integration tests (14320-40098) or the dev stack
 ### Adding New Features
 
 1. **API First**: Define API endpoints and data models
-2. **Database Models**: Create/update Mongoose schemas and ClickHouse queries
+2. **Database models**: Create/update SQLite repositories and ClickHouse queries
 3. **Frontend Integration**: Build UI components and integrate with API
 4. **Testing**: Add unit and integration tests
 5. **Documentation**: Update relevant docs
@@ -302,9 +300,8 @@ serves both the app and the API.
 ### How it works
 
 1. `packages/api/src/serverless.ts` exposes the Express app from `api-app.ts` as
-   a stateless `(req, res) => Promise<void>` handler. It lazily connects to
-   MongoDB on the first invocation and caches the connection across warm
-   invocations.
+   a `(req, res) => Promise<void>` handler. It lazily opens and migrates SQLite
+   on the first invocation and caches the connection across warm invocations.
 2. `packages/app/pages/api/[...all].ts` branches on the `HDX_PREVIEW_INLINE_API`
    env var. When `true`, it `require()`s the compiled serverless handler and
    dispatches directly. Otherwise it falls back to the existing
@@ -313,7 +310,7 @@ serves both the app and the API.
    `@hyperdx/api` as a CommonJS external **unless** `HDX_PREVIEW_INLINE_API` is
    `true`. This keeps production app builds (Docker fullstack image, standalone
    Next output) byte-for-byte equivalent to before — they never bundle
-   passport-saml, mongoose, AWS SDK, etc.
+   passport-saml, AWS SDK, etc.
 4. `vercel.json` declares the repo-root build commands so Vercel builds
    `common-utils` → `api` → `app` in order.
 
@@ -322,7 +319,7 @@ serves both the app and the API.
 | Key                                          | Notes                                                             |
 | -------------------------------------------- | ----------------------------------------------------------------- |
 | `HDX_PREVIEW_INLINE_API`                     | `true` — turns on the inline path                                 |
-| `MONGO_URI`                                  | Preview MongoDB connection string                                 |
+| `SQLITE_PATH`                                | SQLite file path on persistent local storage                       |
 | `EXPRESS_SESSION_SECRET`                     | Random 32+ char string                                            |
 | `DISABLED_AUTH_METHODS`                      | `google,saml` (avoids per-preview OAuth callback URL config)      |
 | `AI_PROVIDER`, `AI_API_KEY`, `AI_MODEL_NAME` | Optional, only if AI features should work                         |
@@ -343,7 +340,6 @@ unset (or `false`) so production deployments keep using the proxy path.
   unzipped limit. If it grows, mark heavy deps (`@aws-sdk/*`,
   `@node-saml/passport-saml`, AI SDKs) as `serverExternalPackages` in
   `next.config.mjs`.
-- **Cold-start latency.** First request after idle pays ~500–1500 ms for the
-  initial Mongo connection.
-- **Shared preview MongoDB.** Unless you partition by database name, all preview
-  deployments share the same Mongo state.
+- **Persistence.** Serverless hosts with ephemeral filesystems cannot preserve
+  the SQLite file across instances or cold starts. Inline API previews need a
+  persistent local filesystem and should otherwise use a separately hosted API.

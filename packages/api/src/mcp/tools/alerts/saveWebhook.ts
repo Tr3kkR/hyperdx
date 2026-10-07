@@ -1,5 +1,4 @@
 import { WebhookService } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import { createWebhook, updateWebhook } from '@/controllers/webhook';
@@ -115,15 +114,9 @@ export function registerSaveWebhook({
         );
       }
 
-      const mongoTeamId = new mongoose.Types.ObjectId(teamId);
-
       try {
         if (webhookId != null) {
-          const result = await updateWebhook(
-            mongoTeamId,
-            webhookId,
-            parsed.data,
-          );
+          const result = await updateWebhook(teamId, webhookId, parsed.data);
           if (result.status === 'not_found') {
             return mcpUserError('Webhook not found');
           }
@@ -135,7 +128,7 @@ export function registerSaveWebhook({
           return webhookResult(result.webhook);
         }
 
-        const webhook = await createWebhook(mongoTeamId, parsed.data);
+        const webhook = await createWebhook(teamId, parsed.data);
         return webhookResult(webhook);
       } catch (e) {
         if (e instanceof WebhookUrlValidationError) {

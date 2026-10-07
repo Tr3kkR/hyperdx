@@ -7,17 +7,16 @@ import type {
 } from '@hyperdx/common-utils/dist/types';
 import { AlertThresholdType } from '@hyperdx/common-utils/dist/types';
 import express from 'express';
-import { ObjectId } from 'mongodb';
-import mongoose from 'mongoose';
 import ms from 'ms';
 import { z } from 'zod';
 import { validateRequest } from 'zod-express-middleware';
 
 import { createWebhook, deleteWebhook } from '@/controllers/webhook';
+import { isId, newId } from '@/db/ids';
 import type { WebhookDoc } from '@/db/repos/webhooks';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import { AlertSource, AlertState } from '@/models/alert';
-import Webhook, { WebhookService } from '@/models/webhook';
+import { WebhookService } from '@/models/webhook';
 import {
   ALERT_STATUS_BY_STATE,
   ALERT_TYPE_BY_SOURCE,
@@ -87,7 +86,7 @@ type WebhookPlain = Pick<
 const toWebhookPlain = (doc: WebhookDoc): WebhookPlain => doc;
 
 const serializeWebhook = (doc: WebhookDoc): WebhookApiData => {
-  const { team: _team, ...data } = doc;
+  const { team: _team, id: _id, ...data } = doc;
   return {
     ...data,
     createdAt: doc.createdAt.toISOString(),
@@ -229,7 +228,7 @@ router.put(
   validateRequest({
     params: z.object({
       id: z.string().refine(val => {
-        return mongoose.Types.ObjectId.isValid(val);
+        return isId(val);
       }),
     }),
     body: z.object({
@@ -361,7 +360,7 @@ router.delete(
   validateRequest({
     params: z.object({
       id: z.string().refine(val => {
-        return mongoose.Types.ObjectId.isValid(val);
+        return isId(val);
       }),
     }),
   }),
@@ -401,7 +400,7 @@ router.post(
       url: z.string().url(),
       webhookId: z
         .string()
-        .refine(val => mongoose.Types.ObjectId.isValid(val))
+        .refine(val => isId(val))
         .optional(),
     }),
   }),
@@ -437,14 +436,16 @@ router.post(
       validateWebhookUrl({ service, url });
 
       // Create a temporary webhook object for testing
-      const testWebhook = new Webhook({
-        team: new ObjectId(teamId),
+      const testWebhook = {
+        _id: newId(),
+        team: teamId,
+        name: 'Test Webhook',
         service,
         url,
         queryParams,
         headers,
         body,
-      });
+      };
 
       // Every field a real firing sends, so a body written against the
       // documented variables renders here exactly as it will in production.

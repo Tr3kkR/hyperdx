@@ -4,8 +4,8 @@ import {
   type TSourceNoId,
   UseTextIndex,
 } from '@hyperdx/common-utils/dist/types';
+import { ObjectId } from 'bson';
 import express from 'express';
-import { Types } from 'mongoose';
 import request from 'supertest';
 
 import { LOCAL_APP_TEAM_ID } from '@/controllers/team';
@@ -22,7 +22,7 @@ import sourcesRouter from '@/routers/api/sources';
 const MOCK_SOURCE: Omit<Extract<TSource, { kind: 'log' }>, 'id'> = {
   kind: SourceKind.Log,
   name: 'Test Source',
-  connection: new Types.ObjectId().toString(),
+  connection: new ObjectId().toString(),
   from: {
     databaseName: 'test_db',
     tableName: 'test_table',
@@ -34,7 +34,7 @@ const MOCK_SOURCE: Omit<Extract<TSource, { kind: 'log' }>, 'id'> = {
 const MOCK_METRIC_SOURCE: Omit<Extract<TSource, { kind: 'metric' }>, 'id'> = {
   kind: SourceKind.Metric,
   name: 'Test Metric Source',
-  connection: new Types.ObjectId().toString(),
+  connection: new ObjectId().toString(),
   from: {
     databaseName: 'test_db',
     tableName: '',
@@ -50,7 +50,7 @@ const MOCK_METRIC_SOURCE: Omit<Extract<TSource, { kind: 'metric' }>, 'id'> = {
   },
 };
 
-const createTestConnection = (team: Types.ObjectId, id: string) =>
+const createTestConnection = (team: ObjectId, id: string) =>
   connectionsRepo.create(String(team), {
     _id: id,
     name: 'Test Connection',
@@ -60,14 +60,14 @@ const createTestConnection = (team: Types.ObjectId, id: string) =>
   });
 
 const createSourceFixture = (input: {
-  team: string | Types.ObjectId;
+  team: string | ObjectId;
   [key: string]: unknown;
 }) => {
   const { team, ...source } = input;
   return sourcesRepo.create(String(team), source as TSourceNoId);
 };
 
-const findSourceFixture = (id: string | Types.ObjectId) =>
+const findSourceFixture = (id: string | ObjectId) =>
   sourcesRepo.findById(String(id));
 
 const getLoggedInAgent = async (server: ReturnType<typeof getServer>) => {
@@ -102,7 +102,7 @@ describe('sources router', () => {
     // Create test source
     await createSourceFixture({
       ...MOCK_SOURCE,
-      team: new Types.ObjectId(team._id),
+      team: new ObjectId(team._id),
     });
 
     const response = await agent.get('/sources').expect(200);
@@ -158,7 +158,7 @@ describe('sources router', () => {
         .post('/sources')
         .send({
           ...MOCK_SOURCE,
-          connection: new Types.ObjectId().toString(),
+          connection: new ObjectId().toString(),
         })
         .expect(400);
     });
@@ -166,8 +166,8 @@ describe('sources router', () => {
     it('POST / - returns 400 for another team connection', async () => {
       const { agent } = await getLoggedInAgent(server);
       const otherConnection = await createTestConnection(
-        new Types.ObjectId(),
-        new Types.ObjectId().toString(),
+        new ObjectId(),
+        new ObjectId().toString(),
       );
 
       await agent
@@ -183,11 +183,11 @@ describe('sources router', () => {
       const { agent, team } = await getLoggedInAgent(server);
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
       const otherConnection = await createTestConnection(
-        new Types.ObjectId(),
-        new Types.ObjectId().toString(),
+        new ObjectId(),
+        new ObjectId().toString(),
       );
 
       await agent
@@ -208,7 +208,7 @@ describe('sources router', () => {
       const { agent, team } = await getLoggedInAgent(server);
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       await agent
@@ -216,7 +216,7 @@ describe('sources router', () => {
         .send({
           ...MOCK_SOURCE,
           id: source._id.toString(),
-          connection: new Types.ObjectId().toString(),
+          connection: new ObjectId().toString(),
         })
         .expect(400);
     });
@@ -317,7 +317,7 @@ describe('sources router', () => {
 
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       const querySettings = [{ setting: 'max_execution_time', value: '120' }];
@@ -340,7 +340,7 @@ describe('sources router', () => {
 
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       const querySettings = Array.from({ length: 11 }, (_, i) => ({
@@ -366,7 +366,7 @@ describe('sources router', () => {
     // Create test source
     const source = await createSourceFixture({
       ...MOCK_SOURCE,
-      team: new Types.ObjectId(team._id),
+      team: new ObjectId(team._id),
     });
 
     const updatedSource = {
@@ -385,7 +385,7 @@ describe('sources router', () => {
   it('PUT /:id - returns 404 when source does not exist', async () => {
     const { agent } = await getLoggedInAgent(server);
 
-    const nonExistentId = new Types.ObjectId().toString();
+    const nonExistentId = new ObjectId().toString();
 
     await agent
       .put(`/sources/${nonExistentId}`)
@@ -414,7 +414,7 @@ describe('sources router', () => {
         gauge: 'otel_metrics_gauge',
         sum: 'otel_metrics_sum',
       },
-      team: new Types.ObjectId(team._id),
+      team: new ObjectId(team._id),
     });
 
     // Verify the metric source has metricTables
@@ -476,7 +476,7 @@ describe('sources router', () => {
         gauge: 'otel_metrics_gauge',
         sum: 'otel_metrics_sum',
       },
-      team: new Types.ObjectId(team._id),
+      team: new ObjectId(team._id),
     });
 
     // Step 1: Update the metric source (but keep it as Metric)
@@ -674,7 +674,7 @@ describe('sources router', () => {
 
       const metricSource = await createSourceFixture({
         ...MOCK_METRIC_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       await agent
@@ -700,7 +700,7 @@ describe('sources router', () => {
       const metricSource = await createSourceFixture({
         ...MOCK_METRIC_SOURCE,
         seriesTable: 'otel_metrics_series',
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       const createdSource = await findSourceFixture(metricSource._id);
@@ -731,7 +731,7 @@ describe('sources router', () => {
 
       const metricSource = await createSourceFixture({
         ...MOCK_METRIC_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       const createdSource = await findSourceFixture(metricSource._id);
@@ -796,7 +796,7 @@ describe('sources router', () => {
       const metricSource = await createSourceFixture({
         ...MOCK_METRIC_SOURCE,
         minAutoGranularity: '1 minute',
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       await agent
@@ -822,7 +822,7 @@ describe('sources router', () => {
     // Create test source
     const source = await createSourceFixture({
       ...MOCK_SOURCE,
-      team: new Types.ObjectId(team._id),
+      team: new ObjectId(team._id),
     });
 
     await agent.delete(`/sources/${source._id}`).expect(200);
@@ -835,7 +835,7 @@ describe('sources router', () => {
   it('DELETE /:id - returns 200 when source does not exist', async () => {
     const { agent } = await getLoggedInAgent(server);
 
-    const nonExistentId = new Types.ObjectId().toString();
+    const nonExistentId = new ObjectId().toString();
 
     // This will succeed even if the ID doesn't exist, consistent with the implementation
     await agent.delete(`/sources/${nonExistentId}`).expect(200);
@@ -871,7 +871,7 @@ describe('sources router', () => {
     it('POST / - creates a source when team id is a string', async () => {
       const app = getLocalAppModeApp();
       await createTestConnection(
-        new Types.ObjectId(LOCAL_APP_TEAM_ID),
+        new ObjectId(LOCAL_APP_TEAM_ID),
         MOCK_SOURCE.connection,
       );
 
@@ -892,7 +892,7 @@ describe('sources router', () => {
     it('PUT /:id - updates a source when team id is a string', async () => {
       const app = getLocalAppModeApp();
       await createTestConnection(
-        new Types.ObjectId(LOCAL_APP_TEAM_ID),
+        new ObjectId(LOCAL_APP_TEAM_ID),
         MOCK_SOURCE.connection,
       );
 
@@ -926,7 +926,7 @@ describe('sources router', () => {
 
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'test_table_key_rollup_15m',
           kvRollupTable: 'test_table_kv_rollup_15m',
@@ -964,7 +964,7 @@ describe('sources router', () => {
 
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'old_key_rollup',
           kvRollupTable: 'old_kv_rollup',
@@ -1001,7 +1001,7 @@ describe('sources router', () => {
 
       createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'test_table_key_rollup_15m',
           kvRollupTable: 'test_table_kv_rollup_15m',
@@ -1026,7 +1026,7 @@ describe('sources router', () => {
 
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         metadataMaterializedViews: {
           keyRollupTable: 'test_table_key_rollup_15m',
           kvRollupTable: 'test_table_kv_rollup_15m',
@@ -1047,7 +1047,7 @@ describe('sources router', () => {
 
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
       });
 
       await agent
@@ -1149,7 +1149,7 @@ describe('sources router', () => {
 
       const source = await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         useTextIndexForImplicitColumn: UseTextIndex.Auto,
       });
 
@@ -1174,7 +1174,7 @@ describe('sources router', () => {
 
       await createSourceFixture({
         ...MOCK_SOURCE,
-        team: new Types.ObjectId(team._id),
+        team: new ObjectId(team._id),
         useTextIndexForImplicitColumn: UseTextIndex.Disabled,
       });
 

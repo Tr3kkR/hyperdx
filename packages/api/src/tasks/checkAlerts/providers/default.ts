@@ -24,7 +24,6 @@ import * as sourcesRepo from '@/db/repos/sources';
 import type { WebhookLike as IWebhook } from '@/db/repos/webhooks';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import { pruneExpired } from '@/db/retention';
-import type { ObjectId } from '@/models';
 import {
   AlertSource,
   AlertState,
@@ -32,6 +31,7 @@ import {
   type IAlertError,
 } from '@/models/alert';
 import { IAlertHistory, IAlertHistoryAnalytics } from '@/models/alertHistory';
+import type { ObjectId } from '@/models/ids';
 import {
   AggregatedAlertHistory,
   getConsecutiveWindowHistories,

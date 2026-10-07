@@ -3,7 +3,7 @@ import {
   SourceKind,
 } from '@hyperdx/common-utils/dist/types';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import * as config from '@/config';
 import {
@@ -732,7 +732,7 @@ describe('MCP Alert Tools', () => {
           'clickstack_save_alert',
           makeInlineInput(webhook._id.toString(), {
             chartConfig: makeChartConfig({
-              sourceId: new mongoose.Types.ObjectId().toString(),
+              sourceId: new ObjectId().toString(),
             }),
           }),
         );

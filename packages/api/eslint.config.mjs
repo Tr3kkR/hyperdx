@@ -18,7 +18,6 @@ export default [
       'coverage/**',
       'src/coverage/**',
       'migrations/**',
-      'migrate-mongo-config.ts',
       '**/*.config.js',
       '**/*.config.mjs',
       'jest.config.js',
@@ -62,7 +61,7 @@ export default [
       'n/no-unpublished-import': [
         'error',
         {
-          allowModules: ['mongodb', 'supertest'],
+          allowModules: ['supertest'],
         },
       ],
       'n/no-unsupported-features/es-syntax': [

@@ -94,7 +94,7 @@ console.info(
 
 const child = spawn('npx', playwrightCmd, {
   stdio: 'inherit',
-  shell: true,
+  shell: false,
   env,
   cwd: path.join(__dirname, '..'),
 });

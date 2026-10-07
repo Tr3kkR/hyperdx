@@ -5,7 +5,7 @@ import {
   SourceKind,
   Tile,
 } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import {
   makeAlertChartConfig,
@@ -27,7 +27,7 @@ import {
   renderAlertTemplate,
 } from '@/tasks/checkAlerts/template';
 
-const TEST_TEAM_ID = new mongoose.Types.ObjectId().toString();
+const TEST_TEAM_ID = new ObjectId().toString();
 
 // Test fixtures only need a handful of IWebhook fields — a single narrowing
 // point instead of an `as unknown as IWebhook` suppression-worthy cast at
@@ -175,7 +175,7 @@ const makeTileView = (
     tileId: (overrides.tile ?? testTile).id,
   },
   dashboard: {
-    _id: new mongoose.Types.ObjectId(),
+    _id: new ObjectId().toString(),
     id: 'id-123',
     name: 'My Dashboard',
     tiles: [overrides.tile ?? testTile],
@@ -491,8 +491,8 @@ describe('enriched message fields', () => {
     ) => AlertMessageTemplateDefaultView = makeSearchView,
   ) => {
     const webhook = castWebhook({
-      _id: new mongoose.Types.ObjectId(),
-      team: new mongoose.Types.ObjectId(),
+      _id: new ObjectId().toString(),
+      team: new ObjectId().toString(),
       service: 'slack',
       name: 'enriched-hook',
       url: 'https://hooks.slack.com/services/x',
@@ -982,8 +982,8 @@ describe('per-event notification cap', () => {
 
   const makeWebhook = (i: number) =>
     castWebhook({
-      _id: new mongoose.Types.ObjectId(),
-      team: new mongoose.Types.ObjectId(),
+      _id: new ObjectId().toString(),
+      team: new ObjectId().toString(),
       service: 'slack',
       name: `hook-${i}`,
       url: 'https://hooks.slack.com/services/x',
@@ -1172,8 +1172,8 @@ describe('per-event notification cap', () => {
 describe('notification targets are resolved once per webhook', () => {
   const makeWebhook = (name: string) =>
     castWebhook({
-      _id: new mongoose.Types.ObjectId(),
-      team: new mongoose.Types.ObjectId(),
+      _id: new ObjectId().toString(),
+      team: new ObjectId().toString(),
       service: 'slack',
       name,
       url: 'https://hooks.slack.com/services/x',

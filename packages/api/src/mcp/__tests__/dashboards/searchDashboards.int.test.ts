@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
 import { createDashboardFixture } from '@/test/sqliteMetadata';
@@ -243,7 +243,7 @@ describe('MCP Dashboard Tools - clickstack_search_dashboards', () => {
       team: ctx.team._id,
     });
     // Create a dashboard for a different team
-    const otherTeamId = new mongoose.Types.ObjectId();
+    const otherTeamId = new ObjectId();
     createDashboardFixture({
       name: 'My Dashboard',
       tiles: [],

@@ -1,19 +1,5 @@
 name: hdx-e2e
 services:
-  db:
-    image: mongo:5.0.32-focal
-    ports:
-      - ${HDX_E2E_MONGO_PORT:-21100}:27017
-    networks:
-      - internal
-    deploy:
-      resources:
-        limits:
-          memory: 1G
-          cpus: '2.0'
-        reservations:
-          memory: 512M
-          cpus: '0.5'
   ch-server:
     image: clickhouse/clickhouse-server:26.8-alpine
     ports:

@@ -19,7 +19,6 @@ import * as sourcesRepo from '@/db/repos/sources';
 import type { UserDoc as IUser } from '@/db/repos/users';
 import { hydrateUsers } from '@/db/repos/users';
 import * as webhooksRepo from '@/db/repos/webhooks';
-import type { ObjectId } from '@/models';
 import {
   AlertChannel,
   AlertSource,
@@ -27,6 +26,7 @@ import {
   IAlert,
 } from '@/models/alert';
 import { IDashboard } from '@/models/dashboard';
+import type { ObjectId } from '@/models/ids';
 import { ISavedSearch } from '@/models/savedSearch';
 import { type AlertRefs, deriveAlertDisplayFields } from '@/utils/alerts';
 import { Api400Error } from '@/utils/errors';

@@ -4,7 +4,7 @@ import {
   DisplayType,
   SourceKind,
 } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import type { WebhookDoc } from '@/db/repos/webhooks';
 import {
@@ -272,7 +272,7 @@ describe('alerts router', () => {
   it('can update an ungrouped saved-search alert returned with null groupBy', async () => {
     const savedSearch = await createSavedSearchFixture({
       name: 'Test Saved Search',
-      source: new mongoose.Types.ObjectId(),
+      source: new ObjectId(),
       team: team._id,
     });
     const created = await agent
@@ -311,7 +311,7 @@ describe('alerts router', () => {
     const tileId = dashboard.body.tiles[0].id;
     const savedSearch = await createSavedSearchFixture({
       name: 'Test Saved Search',
-      source: new mongoose.Types.ObjectId(),
+      source: new ObjectId(),
       team: team._id,
     });
     const staleAlert = await createAlertFixture({
@@ -324,7 +324,7 @@ describe('alerts router', () => {
       threshold: 8,
       thresholdType: AlertThresholdType.ABOVE,
       source: AlertSource.TILE,
-      savedSearch: new mongoose.Types.ObjectId(),
+      savedSearch: new ObjectId(),
       groupBy: 'service.name',
       dashboard: dashboard.body.id,
       tileId,
@@ -501,7 +501,7 @@ describe('alerts router', () => {
       team: team._id,
       from: { databaseName: 'default', tableName: 'otel_logs' },
       timestampValueExpression: 'Timestamp',
-      connection: new mongoose.Types.ObjectId(),
+      connection: new ObjectId(),
       name: 'Logs',
     });
 
@@ -530,7 +530,7 @@ describe('alerts router', () => {
   it('Derives name and tags from the saved search for a document stored without them', async () => {
     const savedSearch = await createSavedSearchFixture({
       name: 'Legacy search',
-      source: new mongoose.Types.ObjectId(),
+      source: new ObjectId(),
       team: team._id,
       tags: ['legacy'],
     });
@@ -1737,7 +1737,7 @@ describe('alerts router', () => {
     const makeSavedSearch = () =>
       createSavedSearchFixture({
         name: 'Test Saved Search',
-        source: new mongoose.Types.ObjectId(),
+        source: new ObjectId(),
         team: team._id,
       });
 
@@ -1884,7 +1884,7 @@ describe('alerts router', () => {
         name: 'Foreign Webhook',
         service: WebhookService.Slack,
         url: 'https://hooks.slack.com/foreign',
-        team: new mongoose.Types.ObjectId(),
+        team: new ObjectId(),
       });
       await agent
         .post('/alerts')

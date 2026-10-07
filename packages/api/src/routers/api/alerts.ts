@@ -8,7 +8,6 @@ import type {
 } from '@hyperdx/common-utils/dist/types';
 import express from 'express';
 import { pick } from 'lodash';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { processRequest, validateRequest } from 'zod-express-middleware';
 
@@ -151,7 +150,7 @@ router.get(
 
       const historyMap = await getRecentAlertHistoriesBatch(
         alerts.map(alert => ({
-          alertId: new ObjectId(alert._id),
+          alertId: alert._id,
           interval: alert.interval,
         })),
         20,
@@ -190,7 +189,7 @@ router.get(
       }
 
       const history = await getRecentAlertHistories({
-        alertId: new ObjectId(alert._id),
+        alertId: alert._id,
         interval: alert.interval,
         limit: 20,
       });
@@ -270,7 +269,7 @@ router.get(
       );
 
       const page = await getAlertEvaluations({
-        alertId: new ObjectId(alert._id),
+        alertId: alert._id,
         interval: alert.interval,
         limit,
         startTime,
@@ -329,7 +328,7 @@ router.get(
       );
 
       const data = await getAlertTransitionsInRange({
-        alertId: new ObjectId(alert._id),
+        alertId: alert._id,
         interval: alert.interval,
         startTime: new Date(startTime),
         endTime: new Date(req.query.endTime),
