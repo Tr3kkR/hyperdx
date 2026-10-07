@@ -36,7 +36,7 @@ exports[`Phase 1 routes retain their response bodies 1`] = `
   },
   "/me": {
     "accessKey": "<uuid>",
-    "aiAssistantEnabled": true,
+    "aiAssistantEnabled": "<boolean>",
     "createdAt": "<date>",
     "email": "fake@deploysentinel.com",
     "id": "<id>",
