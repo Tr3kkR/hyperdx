@@ -47,7 +47,6 @@ import {
 } from '@hyperdx/common-utils/dist/types';
 import * as fns from 'date-fns';
 import { isString, pick } from 'lodash';
-import mongoose from 'mongoose';
 import ms from 'ms';
 import { performance } from 'perf_hooks';
 import { serializeError } from 'serialize-error';
@@ -1255,7 +1254,7 @@ export const processAlert = async (
     const getOrCreateHistory = (groupKey: string): IAlertHistory => {
       if (!histories.has(groupKey)) {
         histories.set(groupKey, {
-          alert: new mongoose.Types.ObjectId(alert.id),
+          alert: alert.id,
           createdAt: nowInMinsRoundDown,
           state: AlertState.OK,
           counts: 0,

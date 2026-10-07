@@ -5,14 +5,13 @@ import {
   getServer,
   makeSavedSearchAlertInput,
 } from '@/fixtures';
-import Alert from '@/models/alert';
 import { WebhookService } from '@/models/webhook';
 import { createWebhookFixture } from '@/test/sqliteMetadata';
 import {
   findSavedSearchFixture,
   setSavedSearchUpdatedByFixture,
 } from '@/test/sqliteMetadata';
-import { findAlertFixture } from '@/test/sqliteMetadata';
+import { findAlertFixture, updateAlertFixture } from '@/test/sqliteMetadata';
 const MOCK_SAVED_SEARCH = {
   name: 'error',
   select: 'Timestamp, ServiceName, SeverityText, Body',
@@ -240,10 +239,7 @@ describe('savedSearch router', () => {
       )
       .expect(200);
     // Alerts written before the fields existed.
-    await Alert.updateOne(
-      { _id: alert.body.data._id },
-      { $set: { displayName: null, tags: null } },
-    );
+    updateAlertFixture(alert.body.data._id, { displayName: null, tags: null });
 
     const savedSearches = await agent.get('/saved-search').expect(200);
     expect(savedSearches.body[0].alerts[0]).toMatchObject({

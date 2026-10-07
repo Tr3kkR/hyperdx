@@ -1,5 +1,5 @@
 import { AlertErrorType } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import { createAlert } from '@/controllers/alerts';
 import { createTeam } from '@/controllers/team';
@@ -74,7 +74,7 @@ describe('Multi-channel alert dispatch', () => {
         savedSearchId: savedSearch.id,
         name: 'Multi Channel Alert',
       },
-      new mongoose.Types.ObjectId(),
+      new ObjectId().toString(),
     );
 
     await seedTriggeringLogs();
@@ -112,7 +112,7 @@ describe('Multi-channel alert dispatch', () => {
         savedSearchId: savedSearch.id,
         name: 'Partial Failure Alert',
       },
-      new mongoose.Types.ObjectId(),
+      new ObjectId().toString(),
     );
 
     await seedTriggeringLogs();
@@ -163,7 +163,7 @@ describe('Multi-channel alert dispatch', () => {
         savedSearchId: savedSearch.id,
         name: 'Single Failing Channel Alert',
       },
-      new mongoose.Types.ObjectId(),
+      new ObjectId().toString(),
     );
 
     await seedTriggeringLogs();

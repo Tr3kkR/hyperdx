@@ -43,15 +43,16 @@ import {
 import { SearchConditionLanguageSchema as whereLanguageSchema } from '@hyperdx/common-utils/dist/types';
 import { pick } from 'lodash';
 import _ from 'lodash';
-import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import { deleteDashboardAlerts } from '@/controllers/alerts';
 import { getConnectionsByTeam } from '@/controllers/connection';
 import { getSources } from '@/controllers/sources';
+import { newId } from '@/db/ids';
 import type { DashboardDoc } from '@/db/repos/dashboards';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import type { DashboardDocument } from '@/models/dashboard';
+import type { ObjectId } from '@/models/ids';
 import {
   translateExternalChartToTileConfig,
   translateExternalFilterToFilter,
@@ -1005,7 +1006,7 @@ type SourceForValidation = Awaited<ReturnType<typeof getSources>>[number];
  * validation flow. The return type is the awaited shape of `getSources`
  * (an array of Source documents) so callers can `await` it directly. */
 async function fetchSourcesForValidation(
-  team: string | mongoose.Types.ObjectId,
+  team: string | ObjectId,
 ): Promise<SourceForValidation[]> {
   return getSources(team.toString());
 }
@@ -1248,7 +1249,7 @@ function filterChangedHeatmapTiles(
  * case separately with a clearer error message.
  */
 async function getInvalidOnClickSearchSources(
-  team: string | mongoose.Types.ObjectId,
+  team: string | ObjectId,
   tiles: ExternalDashboardTileWithId[],
 ): Promise<string[]> {
   const sourceIds = new Set<string>();
@@ -1273,7 +1274,7 @@ async function getInvalidOnClickSearchSources(
  * type=dashboard) that do not exist for the team.
  */
 async function getMissingOnClickDashboards(
-  team: string | mongoose.Types.ObjectId,
+  team: string | ObjectId,
   tiles: ExternalDashboardTileWithId[],
 ): Promise<string[]> {
   const dashboardIds = new Set<string>();
@@ -1298,7 +1299,7 @@ async function getMissingOnClickDashboards(
 
 /** Returns connection IDs referenced in tiles that do not belong to the team */
 async function getMissingConnections(
-  team: string | mongoose.Types.ObjectId,
+  team: string | ObjectId,
   tiles: ExternalDashboardTileWithId[],
 ): Promise<string[]> {
   const connectionIds = new Set<string>();
@@ -1370,7 +1371,7 @@ export function convertExternalTilesToInternal(
     const tileId =
       existingTileIds && tile.id && existingTileIds.has(tile.id)
         ? tile.id
-        : new mongoose.Types.ObjectId().toString();
+        : newId();
     const tileWithId = { ...tile, id: tileId };
     if (isConfigTile(tileWithId)) {
       return convertToInternalTileConfig(tileWithId);
@@ -1396,7 +1397,7 @@ export function convertExternalFiltersToInternal(
     const filterId =
       existingFilterIds && 'id' in filter && existingFilterIds.has(filter.id)
         ? filter.id
-        : new mongoose.Types.ObjectId().toString();
+        : newId();
     return translateExternalFilterToFilter({ ...filter, id: filterId });
   });
 }
@@ -1549,7 +1550,7 @@ export async function cleanupDashboardAlerts({
   existingTileIds,
 }: {
   dashboardId: string;
-  teamId: string | mongoose.Types.ObjectId;
+  teamId: string | ObjectId;
   internalTiles: DashboardDocument['tiles'];
   existingTileIds: Set<string>;
 }) {
@@ -1575,15 +1576,7 @@ export async function cleanupDashboardAlerts({
       { dashboardId, teamId, tileIds: tileIdsToDeleteAlerts },
       'Deleting alerts for tiles with unsupported config or removed tiles',
     );
-    const teamObjectId =
-      teamId instanceof mongoose.Types.ObjectId
-        ? teamId
-        : new mongoose.Types.ObjectId(teamId);
-    await deleteDashboardAlerts(
-      dashboardId,
-      teamObjectId,
-      tileIdsToDeleteAlerts,
-    );
+    await deleteDashboardAlerts(dashboardId, teamId, tileIdsToDeleteAlerts);
   }
 }
 

@@ -22,17 +22,18 @@ export type WebhookDoc = {
   updatedAt: Date;
 };
 
-// Transitional shape also accepts existing in-memory webhook fixtures while
-// alert storage is moved in Phase 5.
 export type WebhookLike = Pick<
   WebhookDoc,
-  'name' | 'service' | 'url' | 'description' | 'body'
-> & {
-  _id: { toString(): string };
-  team: { toString(): string };
-  headers?: Record<string, string> | { toJSON(): unknown };
-  queryParams?: Record<string, string> | { toJSON(): unknown };
-};
+  | '_id'
+  | 'team'
+  | 'name'
+  | 'service'
+  | 'url'
+  | 'description'
+  | 'body'
+  | 'headers'
+  | 'queryParams'
+>;
 
 export type WebhookFields = Pick<WebhookDoc, 'name' | 'service' | 'url'> &
   Partial<Pick<WebhookDoc, 'description' | 'queryParams' | 'headers' | 'body'>>;

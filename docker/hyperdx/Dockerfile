@@ -4,7 +4,6 @@
 # - App (Frontend)
 # For all-in-one build:
 # - Clickhouse
-# - Mongo
 # - Otel Collector (otelcol)
 
 ARG NODE_VERSION=22.22
@@ -122,7 +121,8 @@ ENV NODE_ENV=production
 # Remove package managers from production image (not needed at runtime)
 RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
-    /usr/local/bin/yarn /usr/local/bin/yarnpkg
+    /usr/local/bin/yarn /usr/local/bin/yarnpkg && \
+    mkdir -p /data && chown node:node /data
 
 USER node
 
@@ -192,18 +192,10 @@ COPY --from=goose /bin/goose /usr/local/bin/goose
 # Copy migrate binary (Go-based goose migration tool with full TLS support)
 COPY --from=migrate-builder /migrate /usr/local/bin/migrate
 
-# Install MongoDB and other dependencies (consolidated into a single RUN command).
-# libstdc++/libgcc are the Node.js runtime deps, installed before the v3.9
-# repositories are appended so they resolve from this image's own Alpine release.
-RUN apk add --no-cache libstdc++ libgcc && \
-  echo 'http://dl-cdn.alpinelinux.org/alpine/v3.9/main' >> /etc/apk/repositories && \
-  echo 'http://dl-cdn.alpinelinux.org/alpine/v3.9/community' >> /etc/apk/repositories && \
-  apk update && \
-  apk add --no-cache mongodb yaml-cpp=0.6.2-r2 ca-certificates && \
-  apk add --no-cache --upgrade curl busybox && \
+RUN apk add --no-cache libstdc++ libgcc ca-certificates curl busybox && \
   addgroup -S -g ${USER_GID} otel && \
   adduser  -S -u ${USER_UID} -G otel otel && \
-  mkdir -p /data/db && \
+  mkdir -p /data && \
   install -d -m 0777 -o ${USER_UID} -g ${USER_GID} /etc/otel/supervisor-data && \
   rm -rf /var/cache/apk/* && \
   rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
@@ -217,10 +209,6 @@ COPY --from=prod /app /app
 COPY --from=hyperdx ./refresh-env.js /etc/local/refresh-env.js
 COPY --from=hyperdx ./entry.local.base.sh /etc/local/entry.base.sh
 
-# Copy VEX exception files for Docker Scout vulnerability suppression
-# Reference via: docker scout cves --vex-location /etc/vex/ <image>
-COPY .vex/*.vex.json /etc/vex/
-
 WORKDIR /app
 
 # Add hosts entry in entrypoint script instead of here
@@ -233,7 +221,7 @@ FROM all-in-one-base AS all-in-one-noauth
 
 LABEL org.opencontainers.image.vendor="HyperDX" \
       org.opencontainers.image.title="HyperDX All-in-One (No Auth)" \
-      org.opencontainers.image.description="HyperDX all-in-one image with ClickHouse, MongoDB, and OTel Collector (no authentication)" \
+      org.opencontainers.image.description="HyperDX all-in-one image with ClickHouse, SQLite, and OTel Collector (no authentication)" \
       org.opencontainers.image.source="https://github.com/hyperdxio/hyperdx" \
       org.opencontainers.image.licenses="MIT"
 
@@ -249,7 +237,7 @@ FROM all-in-one-base AS all-in-one-auth
 
 LABEL org.opencontainers.image.vendor="HyperDX" \
       org.opencontainers.image.title="HyperDX All-in-One (With Auth)" \
-      org.opencontainers.image.description="HyperDX all-in-one image with ClickHouse, MongoDB, and OTel Collector (with authentication)" \
+      org.opencontainers.image.description="HyperDX all-in-one image with ClickHouse, SQLite, and OTel Collector (with authentication)" \
       org.opencontainers.image.source="https://github.com/hyperdxio/hyperdx" \
       org.opencontainers.image.licenses="MIT"
 

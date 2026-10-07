@@ -6,24 +6,24 @@
 - **HyperDX API (`packages/api`)**: Node.js/Express backend handling queries and business logic
 - **OpenTelemetry Collector**: Receives and processes telemetry data
 - **ClickHouse**: Primary data store for all telemetry (logs, metrics, traces)
-- **MongoDB**: Metadata storage (users, dashboards, alerts, saved searches)
+- **SQLite**: Metadata storage (users, dashboards, alerts, saved searches)
 
 ## Data Flow
 
 1. Applications send telemetry via OpenTelemetry → OTel Collector
 2. OTel Collector processes and forwards data → ClickHouse
 3. Users interact with UI → API queries ClickHouse
-4. Configuration/metadata stored in MongoDB
+4. Configuration/metadata stored in a local SQLite file
 
-## Key MongoDB Models
+## Key metadata entities
 
 All models follow consistent patterns with:
 - Team-based multi-tenancy (most entities belong to a `team`)
-- ObjectId references between related entities
+- 24-character hex string references between related entities
 - Timestamps for audit trails
 - Zod schema validation
 
-**Key Models** (see `packages/api/src/models/`):
+**Key entities** (see `packages/api/src/db/repos/`):
 - `Team`: Multi-tenant organization unit
 - `User`: Team members with authentication
 - `Source`: ClickHouse data source configuration
@@ -124,11 +124,11 @@ Note: Background tasks do **not** run in Vercel preview deployments (see
 - **Query building**: Use `common-utils` for safe query construction
 - **Schema flexibility**: Support for various telemetry schemas via `Source` configuration
 
-### MongoDB Patterns
+### SQLite patterns
 - **Multi-tenancy**: All queries filtered by team context
-- **Relationships**: Use ObjectId references with proper population
+- **Relationships**: Use 24-character hex ids and explicit joins/lookups
 - **Indexing**: Strategic indexes for query performance
-- **Migrations**: Versioned migrations for schema changes (see `packages/api/migrations/`)
+- **Migrations**: Versioned SQL migrations in `packages/api/migrations/sqlite/`
 
 ## Security Requirements
 
@@ -136,4 +136,3 @@ Note: Background tasks do **not** run in Vercel preview deployments (see
 - **Team isolation**: All data access must filter by team context
 - **API authentication**: Use authentication middleware on protected routes
 - **Secrets**: Never commit secrets; use `.env` files
-

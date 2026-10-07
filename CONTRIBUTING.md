@@ -87,7 +87,7 @@ Service Descriptions:
   instrumented applications and forwards it to ClickHouse for storage. Includes
   OpAMP supervisor that dynamically pulls configuration from HyperDX API.
 - ClickHouse (ch-server): ClickHouse database, stores all telemetry.
-- MongoDB (db): Stores user/saved search/alert/dashboard data.
+- SQLite (`SQLITE_PATH`): Stores user/saved search/alert/dashboard data.
 - HyperDX API (api): Node.js API, executes ClickHouse queries on behalf of the
   frontend and serves the frontend. serves the frontend. Can also run alert
   checker.
@@ -141,7 +141,7 @@ see them reflected in real-time.
 The development stack mounts volumes locally for persisting storage under
 `.volumes`. Each worktree gets its own volume directory (e.g.
 `.volumes/ch_data_dev_89`). Clear the `.volumes` directory to reset ClickHouse
-and MongoDB storage.
+and SQLite storage.
 
 ### Windows
 
@@ -161,7 +161,7 @@ simultaneously with the dev stack and across multiple worktrees.
 
 ### E2E Tests
 
-E2E tests run against a full local stack (MongoDB + ClickHouse + API). Docker
+E2E tests run against a full local stack (SQLite + ClickHouse + API). Docker
 must be running.
 
 ```bash

@@ -1,4 +1,4 @@
-import { Types } from 'mongoose';
+import { ObjectId } from 'bson';
 
 import {
   type AlertChannel,
@@ -20,8 +20,8 @@ const createAlertDocument = (
   overrides: Partial<Record<string, unknown>> = {},
 ): AlertDocument =>
   ({
-    _id: new Types.ObjectId(),
-    team: new Types.ObjectId(),
+    _id: new ObjectId(),
+    team: new ObjectId(),
     threshold: 5,
     interval: '5m',
     thresholdType: AlertThresholdType.ABOVE,
@@ -70,7 +70,7 @@ describe('utils/externalApi', () => {
     it('derives from a populated saved search when unset', () => {
       const alert = createAlertDocument({
         savedSearch: {
-          _id: new Types.ObjectId(),
+          _id: new ObjectId(),
           name: 'Payment 5xx',
           tags: ['payments'],
         },
@@ -88,7 +88,7 @@ describe('utils/externalApi', () => {
         tileId: 'tile-1',
         savedSearch: undefined,
         dashboard: {
-          _id: new Types.ObjectId(),
+          _id: new ObjectId(),
           name: 'Checkout',
           tags: ['team-checkout'],
           tiles: [{ id: 'tile-1', config: { name: 'Error rate' } }],
@@ -102,7 +102,7 @@ describe('utils/externalApi', () => {
     });
 
     it('falls back when the refs are unpopulated and the fields are unset', () => {
-      const alert = createAlertDocument({ savedSearch: new Types.ObjectId() });
+      const alert = createAlertDocument({ savedSearch: new ObjectId() });
 
       const translated = translateAlertDocumentToExternalAlert(alert);
 
@@ -141,8 +141,8 @@ describe('utils/externalApi', () => {
     // A populated ref is a document, and documents don't override toString();
     // stringifying one directly yields "[object Object]".
     it('stringifies ids from populated refs', () => {
-      const savedSearchId = new Types.ObjectId();
-      const dashboardId = new Types.ObjectId();
+      const savedSearchId = new ObjectId();
+      const dashboardId = new ObjectId();
       const alert = createAlertDocument({
         savedSearch: { _id: savedSearchId, name: 'S', tags: [] },
         dashboard: { _id: dashboardId, name: 'D', tags: [], tiles: [] },

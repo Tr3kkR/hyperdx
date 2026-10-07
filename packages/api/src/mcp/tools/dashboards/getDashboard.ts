@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import * as config from '@/config';
@@ -36,9 +35,7 @@ export function registerGetDashboard({
     },
     async ({ id }) => {
       if (!id) {
-        const dashboards = await getDashboards(
-          new mongoose.Types.ObjectId(teamId),
-        );
+        const dashboards = await getDashboards(teamId);
         const output = dashboards.map(d => ({
           id: d._id.toString(),
           name: d.name,

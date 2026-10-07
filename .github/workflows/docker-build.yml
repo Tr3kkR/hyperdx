@@ -135,7 +135,7 @@ jobs:
             type=gha,scope=docker-build-pr-app
           cache-to: type=gha,mode=max,scope=docker-build-pr-app
 
-  # All-in-one image (adds ClickHouse, MongoDB, OTel Collector to the app build)
+  # All-in-one image (adds ClickHouse and OTel Collector to the app build)
   # — docker/hyperdx targets all-in-one-auth AND all-in-one-noauth (the Local
   # image). The two are siblings off the shared all-in-one-base, each with its
   # own final COPY of an entry script (entry.local.auth.sh / .noauth.sh), so

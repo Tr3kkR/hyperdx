@@ -16,7 +16,7 @@
 
 - **Runtime**: Node.js 22+ with TypeScript
 - **Framework**: Express.js
-- **Database**: ClickHouse (telemetry data), MongoDB via Mongoose (metadata)
+- **Database**: ClickHouse (telemetry data), SQLite (application metadata)
 - **Authentication**: Passport.js with local strategy
 - **Validation**: Zod schemas
 - **Telemetry**: Self-instrumented with `@hyperdx/node-opentelemetry`
@@ -26,4 +26,3 @@
 - Shared TypeScript utilities for query parsing and ClickHouse operations
 - Zod schemas for data validation
 - SQL formatting and query building helpers
-

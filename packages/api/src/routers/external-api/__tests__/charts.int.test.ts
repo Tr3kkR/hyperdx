@@ -1,6 +1,6 @@
 import { SourceKind } from '@hyperdx/common-utils/dist/types';
 import { MetricsDataType } from '@hyperdx/common-utils/dist/types';
-import { ObjectId } from 'mongodb';
+import { ObjectId } from 'bson';
 import request from 'supertest';
 
 import * as config from '@/config';

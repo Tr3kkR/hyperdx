@@ -15,7 +15,7 @@ import { handleAuthError, redirectToDashboard } from '@/middleware/auth';
 import { setupTeamDefaults } from '@/setupDefaults';
 import logger from '@/utils/logger';
 import passport from '@/utils/passport';
-import { isMongoConnected, mongoReadyStateName } from '@/utils/readiness';
+import { isDbReady } from '@/utils/readiness';
 import { passwordSchema } from '@/utils/validators';
 
 const registrationSchema = z
@@ -32,7 +32,7 @@ const registrationSchema = z
 const router = express.Router();
 
 // Liveness: 200 whenever the process can serve HTTP. Deliberately checks no
-// external dependencies — restarting the pod does not fix a Mongo outage.
+// external dependencies.
 router.get('/health', async (req, res) => {
   res.send({
     data: 'OK',
@@ -42,20 +42,19 @@ router.get('/health', async (req, res) => {
   });
 });
 
-// Readiness: 503 unless MongoDB is connected. Nearly every route is
-// Mongo-backed, so a pod without a Mongo connection cannot serve traffic and
-// should be removed from Service endpoints (see utils/readiness.ts).
+// Readiness: a pod without its SQLite database cannot serve requests.
 router.get('/ready', async (req, res) => {
-  if (isMongoConnected()) {
+  if (isDbReady()) {
     return res.send({
       data: 'OK',
+      sqlite: 'ok',
       version: config.CODE_VERSION,
       env: config.NODE_ENV,
     });
   }
   res.status(503).send({
     status: 'unavailable',
-    mongo: mongoReadyStateName(),
+    sqlite: 'error',
   });
 });
 

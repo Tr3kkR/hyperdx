@@ -14,7 +14,7 @@ schema-agnostic design, and correlation across all telemetry types in one place.
 This is a **monorepo** with six packages:
 
 - `packages/app` - Next.js frontend (TypeScript, Mantine UI, TanStack Query)
-- `packages/api` - Express backend (Node.js 22+, MongoDB for metadata,
+- `packages/api` - Express backend (Node.js 22+, SQLite for metadata,
   ClickHouse for telemetry). Also hosts the **MCP server**, **External API v2**,
   and **OpAMP server** as sub-applications.
 - `packages/common-utils` - Shared TypeScript utilities for query parsing and
@@ -34,7 +34,7 @@ This is a **monorepo** with six packages:
   comparison workflow.
 
 **Data flow**: Apps → OpenTelemetry Collector → ClickHouse (telemetry data) /
-MongoDB (configuration/metadata)
+SQLite (configuration/metadata)
 
 ## Development Setup (HOW)
 
@@ -44,7 +44,7 @@ yarn dev            # Start full stack with worktree-isolated ports
 ```
 
 The project uses **Yarn 4.13.0** workspaces. Docker Compose manages ClickHouse,
-MongoDB, and the OTel Collector.
+and the OTel Collector. SQLite runs in the API process.
 
 **This repo is multi-agent friendly.** `yarn dev`, `make dev-int`, and
 `make dev-e2e` all use slot-based port isolation so multiple worktrees can run
@@ -220,7 +220,7 @@ make dev-e2e-clean                               # Remove test artifacts
 - **State management**: Jotai (client), TanStack Query (server), URL params
   (filters)
 - **UI library**: Mantine components are the standard (not custom UI)
-- **Database patterns**: MongoDB for metadata with Mongoose, ClickHouse for
+- **Database patterns**: SQLite for metadata, ClickHouse for
   telemetry queries
 
 ## PR Hygiene for Agent-Generated Code
@@ -437,7 +437,7 @@ default `/workspace` directory, the slot is **76**, so services are at:
 - **App**: http://localhost:30276
 - **API**: http://localhost:30176
 - **ClickHouse**: http://localhost:30576
-- **MongoDB**: localhost:30476
+- **SQLite**: `.volumes/hyperdx_dev_76.db`
 
 ### Key commands reference
 
@@ -451,7 +451,7 @@ reference. Quick summary:
 
 ### First-time registration
 
-When the dev stack starts fresh (empty MongoDB), the app shows a registration
+When the dev stack starts fresh (empty SQLite file), the app shows a registration
 page. Create any account to get started — no external auth provider is needed.
 
 ---

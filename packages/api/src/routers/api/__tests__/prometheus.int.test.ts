@@ -1,5 +1,5 @@
 import { Metadata } from '@hyperdx/common-utils/dist/core/metadata';
-import { Types } from 'mongoose';
+import { ObjectId } from 'bson';
 
 import * as config from '@/config';
 import {
@@ -77,7 +77,7 @@ describe('prometheus router', () => {
   });
 
   const seedPrometheusConnection = async (
-    teamId: Types.ObjectId,
+    teamId: ObjectId,
     host = 'http://prom.example.com',
   ) => {
     return createConnectionFixture({
@@ -90,7 +90,7 @@ describe('prometheus router', () => {
     });
   };
 
-  const seedClickHouseConnection = async (teamId: Types.ObjectId) => {
+  const seedClickHouseConnection = async (teamId: ObjectId) => {
     return createConnectionFixture({
       team: teamId,
       name: 'CH',
@@ -110,7 +110,7 @@ describe('prometheus router', () => {
       const { agent } = await getLoggedInAgent(server);
       const res = await agent
         .get('/v1/prometheus/query_range')
-        .query({ connectionId: new Types.ObjectId().toString() })
+        .query({ connectionId: new ObjectId().toString() })
         .expect(400);
       expect(res.body).toMatchObject({
         status: 'error',
@@ -138,7 +138,7 @@ describe('prometheus router', () => {
         .get('/v1/prometheus/query_range')
         .query({
           query: 'up',
-          connectionId: new Types.ObjectId().toString(),
+          connectionId: new ObjectId().toString(),
         })
         .expect(404);
       expect(res.body).toMatchObject({
@@ -1117,7 +1117,7 @@ describe('prometheus router', () => {
       const { agent } = await getLoggedInAgent(server);
       await agent
         .get('/v1/prometheus/query')
-        .query({ connectionId: new Types.ObjectId().toString() })
+        .query({ connectionId: new ObjectId().toString() })
         .expect(400);
     });
 
@@ -1135,7 +1135,7 @@ describe('prometheus router', () => {
         .get('/v1/prometheus/query')
         .query({
           query: 'up',
-          connectionId: new Types.ObjectId().toString(),
+          connectionId: new ObjectId().toString(),
         })
         .expect(404);
     });
@@ -1226,7 +1226,7 @@ describe('prometheus router', () => {
       const { agent } = await getLoggedInAgent(server);
       await agent
         .get('/v1/prometheus/label/__name__/values')
-        .query({ connectionId: new Types.ObjectId().toString() })
+        .query({ connectionId: new ObjectId().toString() })
         .expect(404);
     });
 
@@ -1705,7 +1705,7 @@ describe('prometheus router', () => {
       const { agent } = await getLoggedInAgent(server);
       await agent
         .get('/v1/prometheus/labels')
-        .query({ connectionId: new Types.ObjectId().toString() })
+        .query({ connectionId: new ObjectId().toString() })
         .expect(404);
     });
 
@@ -1908,7 +1908,7 @@ describe('prometheus router', () => {
       const { agent } = await getLoggedInAgent(server);
       const res = await agent
         .get('/v1/prometheus/query_exemplars')
-        .query({ connectionId: new Types.ObjectId().toString() })
+        .query({ connectionId: new ObjectId().toString() })
         .expect(400);
       expect(res.body).toMatchObject({
         status: 'error',
@@ -1935,9 +1935,7 @@ describe('prometheus router', () => {
       const { agent } = await getLoggedInAgent(server);
       // A real, resolvable connection — just not this team's. The 404 must come
       // from the team scoping, not from the id simply not existing.
-      const otherTeamConn = await seedPrometheusConnection(
-        new Types.ObjectId(),
-      );
+      const otherTeamConn = await seedPrometheusConnection(new ObjectId());
 
       const res = await agent
         .get('/v1/prometheus/query_exemplars')

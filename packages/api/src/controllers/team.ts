@@ -7,7 +7,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as config from '@/config';
 import { getDb, withTransaction } from '@/db';
 import * as teams from '@/db/repos/teams';
-import type { ObjectId } from '@/models';
+import type { ObjectId } from '@/models/ids';
 
 export function getTeamInviteUrl(token: string) {
   return `${config.FRONTEND_URL}/join-team?token=${token}`;

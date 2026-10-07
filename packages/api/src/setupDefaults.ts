@@ -131,7 +131,7 @@ export async function setupTeamDefaults(teamId: string) {
           typeof connectionId === 'string' &&
           !connectionId.match(/^[0-9a-fA-F]{24}$/)
         ) {
-          // If not a valid ObjectId, treat as a connection name
+          // If not a 24-character hex id, treat as a connection name
           const connection = teamUpdatedConnections.find(
             c => c.name === connectionId,
           );
@@ -218,7 +218,7 @@ export async function setupTeamDefaults(teamId: string) {
         // If we have fields to update, update the source
         if (Object.keys(updateFields).length > 0) {
           await updateSource(teamId, createdSource._id.toString(), {
-            ...createdSource.toObject(),
+            ...createdSource,
             ...updateFields,
           });
 

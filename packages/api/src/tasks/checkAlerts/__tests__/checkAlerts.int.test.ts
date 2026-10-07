@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion, security/detect-object-injection -- Integration fixtures intentionally cast partial documents and index fixed test-only column maps. */
 import { ClickhouseClient } from '@hyperdx/common-utils/dist/clickhouse/node';
 import {
   AlertChartConfig,
@@ -8,7 +9,7 @@ import {
   Tile,
   WebhookService,
 } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 import ms from 'ms';
 
 import * as config from '@/config';
@@ -1229,7 +1230,7 @@ describe('checkAlerts', () => {
 
   describe('Alert Templates', () => {
     // Create a mock metadata object with the necessary methods
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
     const mockMetadata = {
       getColumn: jest.fn().mockImplementation(({ column }) => {
         // Provide basic column definitions for common columns to avoid warnings
@@ -1253,7 +1254,7 @@ describe('checkAlerts', () => {
     } as any;
 
     // Create a mock clickhouse client
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+
     const mockClickhouseClient = {
       query: jest.fn().mockResolvedValue({
         json: jest.fn().mockResolvedValue({ data: [] }),
@@ -1322,7 +1323,7 @@ describe('checkAlerts', () => {
         tileId: 'test-tile-id',
       },
       dashboard: {
-        _id: new mongoose.Types.ObjectId(),
+        _id: new ObjectId().toString(),
         id: 'id-123',
         name: 'My Dashboard',
         tiles: [testTile],
@@ -2166,7 +2167,7 @@ describe('checkAlerts', () => {
             chartConfig: AlertChartConfig;
           },
     ): Promise<AlertDetails> => {
-      const mockUserId = new mongoose.Types.ObjectId();
+      const mockUserId = new ObjectId().toString();
       const alert = await createAlert(team._id, alertConfig, mockUserId);
 
       const enhancedAlert: any = await findAlertFixture(alert.id);
@@ -4613,7 +4614,7 @@ describe('checkAlerts', () => {
 
         // Fresh map with no webhooks in it, mimicking a deleted webhook.
         const emptyWebhooksById = new Map<string, IWebhook>();
-        const missingWebhookId = new mongoose.Types.ObjectId().toString();
+        const missingWebhookId = new ObjectId().toString();
 
         const now = new Date('2023-11-16T22:12:00.000Z');
         const eventMs = new Date('2023-11-16T22:05:00.000Z');
@@ -11521,7 +11522,7 @@ describe('checkAlerts', () => {
           threshold: 1,
           savedSearchId: savedSearch.id,
         },
-        new mongoose.Types.ObjectId(),
+        new ObjectId().toString(),
       );
 
       const enhancedAlert: any = await findAlertFixture(alert.id);
@@ -11628,7 +11629,7 @@ describe('checkAlerts', () => {
         teamWebhooksById,
       } = await createSavedSearchWithMVSource('Body:no'); // Body is not in the MV, so the MV should not be used
 
-      const mockUserId = new mongoose.Types.ObjectId();
+      const mockUserId = new ObjectId().toString();
       const alert = await createAlert(
         team._id,
         {
@@ -11772,7 +11773,7 @@ describe('checkAlerts', () => {
       await server.stop();
     });
 
-    const saveAlert = (id: mongoose.Types.ObjectId, createdAt: Date) => {
+    const saveAlert = (id: ObjectId, createdAt: Date) => {
       return createAlertHistoryFixture({
         alert: id,
         createdAt,
@@ -11781,11 +11782,11 @@ describe('checkAlerts', () => {
     };
 
     it('should return the latest alert history for each alert', async () => {
-      const alert1Id = new mongoose.Types.ObjectId();
+      const alert1Id = new ObjectId();
       await saveAlert(alert1Id, new Date('2025-01-01T00:00:00Z'));
       await saveAlert(alert1Id, new Date('2025-01-01T00:05:00Z'));
 
-      const alert2Id = new mongoose.Types.ObjectId();
+      const alert2Id = new ObjectId();
       await saveAlert(alert2Id, new Date('2025-01-01T00:10:00Z'));
       await saveAlert(alert2Id, new Date('2025-01-01T00:15:00Z'));
 
@@ -11804,11 +11805,11 @@ describe('checkAlerts', () => {
     });
 
     it('should not return alert histories from the future', async () => {
-      const alert1Id = new mongoose.Types.ObjectId();
+      const alert1Id = new ObjectId();
       await saveAlert(alert1Id, new Date('2025-01-01T00:00:00Z'));
       await saveAlert(alert1Id, new Date('2025-01-01T00:05:00Z'));
 
-      const alert2Id = new mongoose.Types.ObjectId();
+      const alert2Id = new ObjectId();
       await saveAlert(alert2Id, new Date('2025-01-01T00:10:00Z'));
       await saveAlert(alert2Id, new Date('2025-01-01T00:15:00Z')); // This one is in the future
 
@@ -11827,11 +11828,11 @@ describe('checkAlerts', () => {
     });
 
     it('should not return a history if there are no histories for the given alert', async () => {
-      const alert1Id = new mongoose.Types.ObjectId();
+      const alert1Id = new ObjectId();
       await saveAlert(alert1Id, new Date('2025-01-01T00:00:00Z'));
       await saveAlert(alert1Id, new Date('2025-01-01T00:05:00Z'));
 
-      const alert2Id = new mongoose.Types.ObjectId();
+      const alert2Id = new ObjectId();
 
       const result = await getPreviousAlertHistories(
         [alert1Id.toString(), alert2Id.toString()],
@@ -11846,11 +11847,11 @@ describe('checkAlerts', () => {
     });
 
     it('should not return a history for an alert that is not provided in the argument', async () => {
-      const alert1Id = new mongoose.Types.ObjectId();
+      const alert1Id = new ObjectId();
       await saveAlert(alert1Id, new Date('2025-01-01T00:00:00Z'));
       await saveAlert(alert1Id, new Date('2025-01-01T00:05:00Z'));
 
-      const alert2Id = new mongoose.Types.ObjectId();
+      const alert2Id = new ObjectId();
       await saveAlert(alert2Id, new Date('2025-01-01T00:10:00Z'));
       await saveAlert(alert2Id, new Date('2025-01-01T00:15:00Z'));
 
@@ -11866,17 +11867,17 @@ describe('checkAlerts', () => {
     });
 
     it('finds the latest history across a large set of alert IDs', async () => {
-      const alert1Id = new mongoose.Types.ObjectId();
+      const alert1Id = new ObjectId();
       await saveAlert(alert1Id, new Date('2025-01-01T00:00:00Z'));
       await saveAlert(alert1Id, new Date('2025-01-01T00:05:00Z'));
 
-      const alert2Id = new mongoose.Types.ObjectId();
+      const alert2Id = new ObjectId();
       await saveAlert(alert2Id, new Date('2025-01-01T00:10:00Z'));
       await saveAlert(alert2Id, new Date('2025-01-01T00:15:00Z'));
 
       const fakeAlertIds = Array(150)
         .fill(null)
-        .map(() => new mongoose.Types.ObjectId().toString());
+        .map(() => new ObjectId().toString());
       const allIds = [
         alert1Id.toString(),
         ...fakeAlertIds,
@@ -11918,11 +11919,10 @@ describe('checkAlerts', () => {
     // alert (id, interval, numConsecutiveWindows, schedule*) and never loads the
     // alert from the DB, so a lightweight stub is sufficient.
     const makeAlert = (
-      id: mongoose.Types.ObjectId,
+      id: ObjectId,
       numConsecutiveWindows?: number,
       interval = '5m',
     ): IAlert =>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
       ({
         id: id.toString(),
         interval,
@@ -11930,7 +11930,7 @@ describe('checkAlerts', () => {
       }) as unknown as IAlert;
 
     const saveHistory = (
-      alertId: mongoose.Types.ObjectId,
+      alertId: ObjectId,
       createdAt: Date,
       opts: { group?: string; state?: AlertState } = {},
     ) =>
@@ -11942,11 +11942,11 @@ describe('checkAlerts', () => {
       });
 
     it('skips alerts with numConsecutiveWindows <= 1', async () => {
-      const alertId = new mongoose.Types.ObjectId();
+      const alertId = new ObjectId();
       await saveHistory(alertId, new Date('2025-01-01T00:10:00Z'));
 
       const result = await getConsecutiveWindowHistories(
-        [makeAlert(alertId, 1), makeAlert(new mongoose.Types.ObjectId())],
+        [makeAlert(alertId, 1), makeAlert(new ObjectId())],
         new Date('2025-01-01T00:17:00Z'),
       );
 
@@ -11954,7 +11954,7 @@ describe('checkAlerts', () => {
     });
 
     it('buckets recent histories per group, newest-first, within the lookback window', async () => {
-      const alertId = new mongoose.Types.ObjectId();
+      const alertId = new ObjectId();
       // now=00:17 -> windowStart=00:15; lookback = (3-1)*5m -> [00:05, 00:15)
       await saveHistory(alertId, new Date('2025-01-01T00:00:00Z'), {
         group: 'ServiceName:a',
@@ -11990,7 +11990,7 @@ describe('checkAlerts', () => {
     });
 
     it('keys ungrouped histories by the bare alert id', async () => {
-      const alertId = new mongoose.Types.ObjectId();
+      const alertId = new ObjectId();
       // now=00:17 -> windowStart=00:15; lookback = (2-1)*5m -> [00:10, 00:15)
       await saveHistory(alertId, new Date('2025-01-01T00:10:00Z'));
 

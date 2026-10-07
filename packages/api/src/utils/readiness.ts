@@ -1,22 +1,27 @@
-import mongoose from 'mongoose';
+import type { DatabaseSync } from 'node:sqlite';
 
-import { mongooseConnection } from '@/models';
+import { getDb } from '@/db';
 
-/**
- * Readiness helpers shared by the API and OpAMP servers.
- *
- * Both servers expose:
- *   - `/health`: pure liveness — 200 whenever the process can serve HTTP.
- *     Orchestrators restart on liveness failures, and restarting does not fix
- *     a dependency outage, so `/health` deliberately checks nothing external.
- *   - `/ready`: readiness — 503 unless MongoDB is connected, since almost
- *     every request (including OpAMP config handling) is Mongo-backed.
- *     Kubernetes readiness failures take the pod out of Service endpoints
- *     without restarting it (https://github.com/hyperdxio/hyperdx/issues/2966).
- */
-export const isMongoConnected = () =>
-  mongooseConnection.readyState === mongoose.ConnectionStates.connected;
+// Readiness checks the SQLite handle shared by the API and OpAMP servers.
+let lastDb: DatabaseSync | undefined;
+let lastCheckAt = 0;
+let lastReady = false;
 
-export const mongoReadyStateName = () =>
-  mongoose.STATES[mongooseConnection.readyState] ??
-  String(mongooseConnection.readyState);
+export const isDbReady = () => {
+  try {
+    const db = getDb();
+    const now = Date.now();
+    if (db === lastDb && now - lastCheckAt < 1000) return lastReady;
+    const row = db.prepare('PRAGMA quick_check').get() as
+      | { quick_check: string }
+      | undefined;
+    lastDb = db;
+    lastCheckAt = now;
+    lastReady = row?.quick_check === 'ok';
+    return lastReady;
+  } catch {
+    lastDb = undefined;
+    lastReady = false;
+    return false;
+  }
+};

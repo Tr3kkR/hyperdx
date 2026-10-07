@@ -1,13 +1,13 @@
-import mongoose from 'mongoose';
 import request from 'supertest';
 
-import { connectDB, getAgent, getServer } from '@/fixtures';
+import { closeDb } from '@/db';
+import { getAgent, getServer, openTestDb } from '@/fixtures';
 import opampApp from '@/opamp/app';
 
 // Covers https://github.com/hyperdxio/hyperdx/issues/2966: `/health` is pure
 // liveness and must stay 200 while the process serves HTTP, whereas `/ready`
-// must reflect MongoDB connectivity so Kubernetes readiness probes can pull a
-// pod that cannot serve Mongo-backed requests out of rotation.
+// must reflect SQLite availability so Kubernetes readiness probes can pull a
+// pod that cannot serve requests out of rotation.
 describe('health and readiness endpoints', () => {
   const server = getServer();
 
@@ -29,34 +29,40 @@ describe('health and readiness endpoints', () => {
     expect(resp.body).toEqual({ status: 'OK' });
   });
 
-  it('GET /ready reflects Mongo connectivity on both servers', async () => {
+  it('GET /ready reflects SQLite availability on both servers', async () => {
     const agent = getAgent(server);
 
     // Connected: both readiness endpoints pass.
     const apiReady = await agent.get('/ready').expect(200);
     expect(apiReady.body.data).toEqual('OK');
-    await request(opampApp).get('/ready').expect(200);
+    expect(apiReady.body.sqlite).toEqual('ok');
+    await request(opampApp)
+      .get('/ready')
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.sqlite).toEqual('ok');
+      });
 
-    await mongoose.disconnect();
+    closeDb();
     try {
-      // Disconnected: readiness fails with the connection state ...
+      // Closed: readiness fails with the SQLite state ...
       const apiNotReady = await agent.get('/ready').expect(503);
       expect(apiNotReady.body).toEqual({
         status: 'unavailable',
-        mongo: 'disconnected',
+        sqlite: 'error',
       });
       const opampNotReady = await request(opampApp).get('/ready').expect(503);
       expect(opampNotReady.body).toEqual({
         status: 'unavailable',
-        mongo: 'disconnected',
+        sqlite: 'error',
       });
 
-      // ... while liveness stays green — restarting would not fix Mongo.
+      // ... while liveness stays green.
       await agent.get('/health').expect(200);
       await request(opampApp).get('/health').expect(200);
     } finally {
-      // Restore the connection for teardown.
-      await connectDB();
+      // Restore the database for teardown.
+      openTestDb();
     }
 
     await agent.get('/ready').expect(200);

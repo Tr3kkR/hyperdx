@@ -1,5 +1,4 @@
-import { ObjectId } from 'mongodb';
-import { Types } from 'mongoose';
+import { ObjectId } from 'bson';
 
 import {
   ALERT_EVALUATION_GROUPS_LIMIT,
@@ -11,7 +10,8 @@ import {
 import * as AlertHistory from '@/db/repos/alertHistories';
 import * as Team from '@/db/repos/teams';
 import { clearDBCollections, closeDB, connectDB } from '@/fixtures';
-import Alert, { AlertState } from '@/models/alert';
+import { AlertState } from '@/models/alert';
+import { createAlertFixture } from '@/test/sqliteMetadata';
 
 describe('alertHistory controller', () => {
   beforeAll(async () => {
@@ -40,7 +40,7 @@ describe('alertHistory controller', () => {
 
     it('should return recent alert histories for a given alert', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -83,7 +83,7 @@ describe('alertHistory controller', () => {
 
     it('should respect the limit parameter', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -114,7 +114,7 @@ describe('alertHistory controller', () => {
 
     it('should group histories by createdAt timestamp', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -154,7 +154,7 @@ describe('alertHistory controller', () => {
 
     it('should set state to ALERT if any grouped history has ALERT state', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -201,7 +201,7 @@ describe('alertHistory controller', () => {
 
     it('should set state to OK when all grouped histories are OK', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -238,7 +238,7 @@ describe('alertHistory controller', () => {
 
     it('should sort histories by createdAt in descending order', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -288,7 +288,7 @@ describe('alertHistory controller', () => {
 
     it('should sort lastValues by startTime in ascending order', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -329,14 +329,14 @@ describe('alertHistory controller', () => {
 
     it('should only return histories for the specified alert', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert1 = await Alert.create({
+      const alert1 = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
         channel: { type: null },
       });
 
-      const alert2 = await Alert.create({
+      const alert2 = await createAlertFixture({
         team: team._id,
         threshold: 200,
         interval: '5m',
@@ -374,7 +374,7 @@ describe('alertHistory controller', () => {
 
     it('surfaces ERROR windows with their recorded errors', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -424,7 +424,7 @@ describe('alertHistory controller', () => {
 
     it('lets ALERT/PENDING outrank ERROR within a grouped window, but ERROR outrank OK', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -491,7 +491,7 @@ describe('alertHistory controller', () => {
   describe('getAlertEvaluations', () => {
     const createAlert = async () => {
       const team = await Team.create({ name: 'Test Team' });
-      return Alert.create({
+      return createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -499,7 +499,7 @@ describe('alertHistory controller', () => {
       });
     };
 
-    const createOkWindow = (alertId: Types.ObjectId, createdAt: Date) =>
+    const createOkWindow = (alertId: string, createdAt: Date) =>
       AlertHistory.create({
         alert: alertId,
         createdAt,
@@ -895,13 +895,13 @@ describe('alertHistory controller', () => {
 
     it('should return histories for multiple alerts in a single batch call', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert1 = await Alert.create({
+      const alert1 = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
         channel: { type: null },
       });
-      const alert2 = await Alert.create({
+      const alert2 = await createAlertFixture({
         team: team._id,
         threshold: 200,
         interval: '5m',
@@ -970,7 +970,7 @@ describe('alertHistory controller', () => {
 
     it('should respect the limit parameter per alert', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -1000,7 +1000,7 @@ describe('alertHistory controller', () => {
 
     it('should detect ALERT state when any grouped history has ALERT state', async () => {
       const team = await Team.create({ name: 'Test Team' });
-      const alert = await Alert.create({
+      const alert = await createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -1044,7 +1044,7 @@ describe('alertHistory controller', () => {
 
     const createAlert = async () => {
       const team = await Team.create({ name: 'Test Team' });
-      return Alert.create({
+      return createAlertFixture({
         team: team._id,
         threshold: 100,
         interval: '5m',
@@ -1053,7 +1053,7 @@ describe('alertHistory controller', () => {
     };
 
     const createHistory = (
-      alertId: Types.ObjectId,
+      alertId: string,
       createdAt: Date,
       state: AlertState,
       counts: number,
@@ -1266,7 +1266,7 @@ describe('alertHistory controller', () => {
 
     describe('bucketStart', () => {
       const createHistoryWithBuckets = (
-        alertId: Types.ObjectId,
+        alertId: string,
         createdAt: Date,
         state: AlertState,
         bucketStarts: Date[],

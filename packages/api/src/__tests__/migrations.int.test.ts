@@ -1,4 +1,4 @@
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import { createTeam } from '@/controllers/team';
 import { getDb } from '@/db';
@@ -20,12 +20,12 @@ const baseAlert = {
 } as const;
 
 const makeSavedSearch = (
-  team: mongoose.Types.ObjectId | string,
+  team: ObjectId | string,
   fields: { name: string; tags?: string[] },
 ) =>
   createSavedSearchFixture({
     team,
-    source: new mongoose.Types.ObjectId(),
+    source: new ObjectId(),
     select: '',
     where: '',
     whereLanguage: 'lucene',
@@ -124,7 +124,7 @@ describe('backfillAlertDisplayFields', () => {
         ...baseAlert,
         team: team._id,
         source: AlertSource.SAVED_SEARCH,
-        savedSearch: new mongoose.Types.ObjectId(),
+        savedSearch: new ObjectId(),
       },
       {
         ...baseAlert,
@@ -136,8 +136,7 @@ describe('backfillAlertDisplayFields', () => {
 
     await backfillAlertDisplayFields();
 
-    const byId = async (id: mongoose.Types.ObjectId | string) =>
-      findAlertFixture(id);
+    const byId = async (id: ObjectId | string) => findAlertFixture(id);
 
     expect(await byId(searchAlert._id)).toMatchObject({
       displayName: 'Error spikes',

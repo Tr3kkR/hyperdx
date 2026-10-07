@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import { deleteDashboard } from '@/controllers/dashboard';
@@ -31,7 +30,7 @@ export function registerDeleteDashboard({
         return mcpUserError('Dashboard not found');
       }
 
-      await deleteDashboard(dashboardId, new mongoose.Types.ObjectId(teamId));
+      await deleteDashboard(dashboardId, teamId);
 
       return {
         content: [

@@ -1,6 +1,6 @@
 import { ClickhouseClient } from '@hyperdx/common-utils/dist/clickhouse/node';
+import { ObjectId } from 'bson';
 import { createServer } from 'http';
-import mongoose from 'mongoose';
 import ms from 'ms';
 
 import * as config from '@/config';
@@ -144,7 +144,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create alert
-    const mockUserId = new mongoose.Types.ObjectId();
+    const mockUserId = new ObjectId().toString();
     const alert = await createAlert(
       team._id,
       {
@@ -305,7 +305,7 @@ describe('Single Invocation Alert Test', () => {
       name: 'Test Webhook',
     });
 
-    const mockUserId = new mongoose.Types.ObjectId();
+    const mockUserId = new ObjectId().toString();
     const alert = await createAlert(
       team._id,
       {
@@ -443,7 +443,7 @@ describe('Single Invocation Alert Test', () => {
       name: 'Test Webhook',
     });
 
-    const mockUserId = new mongoose.Types.ObjectId();
+    const mockUserId = new ObjectId().toString();
     const alert = await createAlert(
       team._id,
       {
@@ -563,7 +563,7 @@ describe('Single Invocation Alert Test', () => {
       name: 'Test Webhook',
     });
 
-    const mockUserId = new mongoose.Types.ObjectId();
+    const mockUserId = new ObjectId().toString();
     const alert = await createAlert(
       team._id,
       {
@@ -764,7 +764,7 @@ describe('Single Invocation Alert Test', () => {
     });
 
     // Create alert that references the SECOND tile (not the first)
-    const mockUserId = new mongoose.Types.ObjectId();
+    const mockUserId = new ObjectId().toString();
     const alert = await createAlert(
       team._id,
       {
@@ -891,7 +891,7 @@ describe('Single Invocation Alert Test', () => {
       ],
     });
 
-    const mockUserId = new mongoose.Types.ObjectId();
+    const mockUserId = new ObjectId().toString();
     const alert = await createAlert(
       team._id,
       {

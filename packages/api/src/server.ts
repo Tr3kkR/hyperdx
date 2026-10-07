@@ -8,7 +8,6 @@ import { LOCAL_APP_TEAM } from '@/controllers/team';
 import { closeDb, openDb } from '@/db';
 import { migrate } from '@/db/migrate';
 import { runStartupMigrations } from '@/migrations';
-import { connectDBWithRetry, mongooseConnection } from '@/models';
 import opampApp from '@/opamp/app';
 import { setupTeamDefaults } from '@/setupDefaults';
 import logger from '@/utils/logger';
@@ -37,20 +36,6 @@ export default class Server {
       hasError = true;
       logger.error({ err: serializeError(err) }, 'SQLite client close failed');
     }
-    const [mongoCloseResult] = await Promise.allSettled([
-      mongooseConnection.close(false),
-    ]);
-
-    if (mongoCloseResult.status === 'rejected') {
-      hasError = true;
-      logger.error(
-        { err: serializeError(mongoCloseResult.reason) },
-        'MongoDB client close failed',
-      );
-    } else {
-      logger.info('MongoDB client closed.');
-    }
-
     if (hasError) {
       throw new Error('Failed to close all clients.');
     }
@@ -65,17 +50,20 @@ export default class Server {
     this.opampServer.keepAliveTimeout = 61000;
     this.opampServer.headersTimeout = 62000;
 
-    this.appServer.listen(config.PORT, () => {
+    this.appServer.listen(process.env.JEST_WORKER_ID ? 0 : config.PORT, () => {
       logger.info(
         `API Server listening on port ${config.PORT}, NODE_ENV=${process.env.NODE_ENV}`,
       );
     });
 
-    this.opampServer.listen(config.OPAMP_PORT, () => {
-      logger.info(
-        `OpAMP Server listening on port ${config.OPAMP_PORT}, NODE_ENV=${process.env.NODE_ENV}`,
-      );
-    });
+    this.opampServer.listen(
+      process.env.JEST_WORKER_ID ? 0 : config.OPAMP_PORT,
+      () => {
+        logger.info(
+          `OpAMP Server listening on port ${config.OPAMP_PORT}, NODE_ENV=${process.env.NODE_ENV}`,
+        );
+      },
+    );
 
     if (this.shouldHandleGracefulShutdown) {
       [this.appServer, this.opampServer].forEach(server => {
@@ -95,18 +83,13 @@ export default class Server {
       });
     }
 
-    // Checked before Mongo so a bad encryption key or KMS policy is reported
-    // even while the Mongo connect below is still retrying.
+    // Verify encryption before opening application state.
     await verifyTokenEncryption();
 
-    // The HTTP servers above are already listening so that `/health`
-    // (liveness) responds while we connect; `/ready` (readiness) stays 503
-    // until the connection below succeeds. Retries forever — see
-    // connectDBWithRetry for why a single failed initial connect must not be
-    // allowed to leave the process running but permanently unable to serve.
+    // The HTTP servers above are already listening so `/health` responds
+    // while `/ready` stays 503 until SQLite has opened and migrated.
     openDb();
     migrate();
-    await connectDBWithRetry();
 
     await runStartupMigrations();
 

@@ -1,6 +1,6 @@
 import { isId } from '@/db/ids';
 import * as connections from '@/db/repos/connections';
-import type { ObjectId } from '@/models';
+import type { ObjectId } from '@/models/ids';
 import { objectIdSchema } from '@/utils/zod';
 
 export type ConnectionValidation =

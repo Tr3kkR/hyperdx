@@ -4,7 +4,7 @@ import {
 } from '@hyperdx/common-utils/dist/types';
 
 import * as presetFilters from '@/db/repos/presetDashboardFilters';
-import { ObjectId } from '@/models';
+import { ObjectId } from '@/models/ids';
 
 export async function getPresetDashboardFilters(
   teamId: string | ObjectId,

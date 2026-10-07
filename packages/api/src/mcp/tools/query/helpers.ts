@@ -17,12 +17,12 @@ import {
   SourceKind,
   UseTextIndex,
 } from '@hyperdx/common-utils/dist/types';
-import { ObjectId } from 'mongodb';
 import ms from 'ms';
 
 import { ClickhouseClient } from '@/clickhouse';
 import { getConnectionById } from '@/controllers/connection';
 import { getSource } from '@/controllers/sources';
+import { newId } from '@/db/ids';
 import type { McpErrorResult } from '@/mcp/utils/errors';
 import { mcpServerError, mcpUserError } from '@/mcp/utils/errors';
 import {
@@ -238,7 +238,7 @@ export function buildTile(
   config: Record<string, unknown>,
 ): ExternalDashboardTileWithId {
   return externalDashboardTileSchemaWithId.parse({
-    id: new ObjectId().toString(),
+    id: newId(),
     name,
     x: 0,
     y: 0,

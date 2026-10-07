@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+import { newId } from '@/db/ids';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import { getServer, randomMongoId } from '@/fixtures';
 import { AlertSource } from '@/models/alert';
@@ -31,11 +30,8 @@ describe('unaddressableTileAlertIds', () => {
   });
 
   // Shaped like the lean rows the manifest router passes in.
-  const alert = (
-    dashboard: string | mongoose.Types.ObjectId,
-    tileId: string,
-  ) => ({
-    _id: new mongoose.Types.ObjectId(),
+  const alert = (dashboard: string, tileId: string) => ({
+    _id: newId(),
     source: AlertSource.TILE,
     dashboard,
     tileId,

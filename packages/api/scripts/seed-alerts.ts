@@ -1,5 +1,5 @@
 /**
- * Seeds this worktree's dev-slot Mongo with N alerts, for exercising the alerts
+ * Seeds this worktree's SQLite store with N alerts, for exercising the alerts
  * page at scale.
  *
  * Half the alerts reference saved searches (up to 2 per search), half reference
@@ -10,29 +10,23 @@
  *   yarn seed:alerts --count 2000
  *   yarn seed:alerts --purge
  *
- * The Mongo URI defaults to the dev slot of the current git worktree, from
- * scripts/slots.sh. Override with --mongo-uri, MONGO_URI, or HDX_DEV_SLOT.
+ * The SQLite path defaults to SQLITE_PATH from the dev slot.
  * The dev stack must be up (`yarn dev`) and registered once, since
  * the script attaches everything to the existing team and log source.
  */
 import { formatTileAlertDisplayName } from '@hyperdx/common-utils/dist/alerts';
 import { DisplayType } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 
-import { closeDb, openDb } from '@/db';
+import { closeDb, getDb, openDb, withTransaction } from '@/db';
 import { migrate } from '@/db/migrate';
+import * as alerts from '@/db/repos/alerts';
+import * as dashboards from '@/db/repos/dashboards';
+import * as savedSearches from '@/db/repos/savedSearches';
+import * as sources from '@/db/repos/sources';
 import * as teams from '@/db/repos/teams';
-import Alert, { AlertSource, AlertState } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
-import { SavedSearch } from '@/models/savedSearch';
-import Webhook, { WebhookService } from '@/models/webhook';
-
-// Several schemas rely on empty strings satisfying `required` (an empty
-// `where` is a valid search). src/models/index.ts installs this for the API;
-// this script deliberately does not import it, to stay clear of config and
-// telemetry bootstrapping.
-mongoose.Schema.Types.String.checkRequired(v => v != null);
-mongoose.set('strictQuery', false);
+import * as webhooks from '@/db/repos/webhooks';
+import { AlertSource, AlertState } from '@/models/alert';
+import { WebhookService } from '@/models/webhook';
 
 const DEFAULT_COUNT = 1000;
 const DEFAULT_TAG = 'seeded';
@@ -61,7 +55,7 @@ const NOTE_TEXT = [
 type Args = {
   count: number;
   tag: string;
-  mongoUri: string | null;
+  sqlitePath: string | null;
   purge: boolean;
   help: boolean;
 };
@@ -72,7 +66,7 @@ const USAGE = [
   '  -n, --count N       number of alerts to create (default 1000)',
   '      --tag TAG       tag applied to seeded dashboards and saved searches',
   '                      (default "seeded")',
-  '      --mongo-uri URI override the dev-slot Mongo URI',
+  '      --sqlite PATH  override SQLITE_PATH',
   '      --purge         delete everything carrying --tag instead of seeding',
 ].join('\n');
 
@@ -80,7 +74,7 @@ function parseArgs(argv: string[]): Args {
   const args: Args = {
     count: DEFAULT_COUNT,
     tag: DEFAULT_TAG,
-    mongoUri: null,
+    sqlitePath: null,
     purge: false,
     help: false,
   };
@@ -103,8 +97,8 @@ function parseArgs(argv: string[]): Args {
       case '--tag':
         args.tag = next();
         break;
-      case '--mongo-uri':
-        args.mongoUri = next();
+      case '--sqlite':
+        args.sqlitePath = next();
         break;
       case '--purge':
         args.purge = true;
@@ -119,20 +113,6 @@ function parseArgs(argv: string[]): Args {
   }
 
   return args;
-}
-
-/**
- * Mongo URI of this worktree's dev stack. `yarn seed:alerts` runs through
- * scripts/with-slots.sh, which sets HDX_DEV_MONGO_PORT.
- */
-function devSlotMongoUri(): string {
-  const port = process.env.HDX_DEV_MONGO_PORT;
-  if (!port) {
-    throw new Error(
-      'HDX_DEV_MONGO_PORT is not set. Run this with `yarn seed:alerts`, or pass --mongo-uri.',
-    );
-  }
-  return `mongodb://localhost:${port}/hyperdx`;
 }
 
 function randomInt(minInclusive: number, maxInclusive: number): number {
@@ -159,15 +139,17 @@ function* zip<A, B>(as: A[], bs: B[]): Generator<[A, B]> {
   }
 }
 
-/** Returns the inserted ids as strings; Mongoose casts them back on write. */
-async function insertInChunks<T extends { _id?: unknown }>(
-  insertMany: (docs: Record<string, unknown>[]) => Promise<T[]>,
+/** Returns the inserted ids as strings, committing each chunk atomically. */
+function insertInChunks<T extends { _id: string }>(
+  insertMany: (docs: Record<string, unknown>[]) => T[],
   docs: Record<string, unknown>[],
-): Promise<string[]> {
+): string[] {
   const ids: string[] = [];
   for (let i = 0; i < docs.length; i += INSERT_CHUNK_SIZE) {
-    const inserted = await insertMany(docs.slice(i, i + INSERT_CHUNK_SIZE));
-    ids.push(...inserted.map(doc => String(doc._id)));
+    const inserted = withTransaction(() =>
+      insertMany(docs.slice(i, i + INSERT_CHUNK_SIZE)),
+    );
+    ids.push(...inserted.map(doc => doc._id));
   }
   return ids;
 }
@@ -248,31 +230,60 @@ function seededWebhookName(tag: string): string {
 }
 
 async function purge(tag: string) {
-  const [dashboards, savedSearches] = await Promise.all([
-    Dashboard.find({ tags: tag }, { _id: 1 }).lean(),
-    SavedSearch.find({ tags: tag }, { _id: 1 }).lean(),
-  ]);
-  const dashboardIds = dashboards.map(d => d._id);
-  const savedSearchIds = savedSearches.map(s => s._id);
-
-  // Alerts first: an alert whose dashboard or saved search is gone renders as
-  // a nameless row rather than disappearing.
-  const { deletedCount: alertsDeleted } = await Alert.deleteMany({
-    $or: [
-      { dashboard: { $in: dashboardIds } },
-      { savedSearch: { $in: savedSearchIds } },
-    ],
-  });
-  await Dashboard.deleteMany({ _id: { $in: dashboardIds } });
-  await SavedSearch.deleteMany({ _id: { $in: savedSearchIds } });
-  const { deletedCount: webhooksDeleted } = await Webhook.deleteMany({
-    service: WebhookService.Generic,
-    name: seededWebhookName(tag),
+  // sqlite-port: Mongo $in/deleteMany on tagged dashboard and search ids.
+  const {
+    alertsDeleted,
+    dashboardsDeleted,
+    savedSearchesDeleted,
+    webhooksDeleted,
+  } = withTransaction(() => {
+    const db = getDb();
+    const dashboardsDeleted = Number(
+      db
+        .prepare(
+          'SELECT count(*) AS n FROM dashboards WHERE EXISTS (SELECT 1 FROM json_each(dashboards.tags) WHERE value=?)',
+        )
+        .get(tag)?.n ?? 0,
+    );
+    const savedSearchesDeleted = Number(
+      db
+        .prepare(
+          'SELECT count(*) AS n FROM savedsearches WHERE EXISTS (SELECT 1 FROM json_each(savedsearches.tags) WHERE value=?)',
+        )
+        .get(tag)?.n ?? 0,
+    );
+    const alertsDeleted = Number(
+      db
+        .prepare(
+          `DELETE FROM alerts WHERE dashboard IN (
+         SELECT id FROM dashboards WHERE EXISTS (SELECT 1 FROM json_each(dashboards.tags) WHERE value=?))
+       OR savedSearch IN (
+         SELECT id FROM savedsearches WHERE EXISTS (SELECT 1 FROM json_each(savedsearches.tags) WHERE value=?))`,
+        )
+        .run(tag, tag).changes,
+    );
+    db.prepare(
+      'DELETE FROM dashboards WHERE EXISTS (SELECT 1 FROM json_each(dashboards.tags) WHERE value=?)',
+    ).run(tag);
+    db.prepare(
+      'DELETE FROM savedsearches WHERE EXISTS (SELECT 1 FROM json_each(savedsearches.tags) WHERE value=?)',
+    ).run(tag);
+    const webhooksDeleted = Number(
+      db
+        .prepare('DELETE FROM webhooks WHERE service=? AND name=?')
+        .run(WebhookService.Generic, seededWebhookName(tag)).changes,
+    );
+    return {
+      alertsDeleted,
+      dashboardsDeleted,
+      savedSearchesDeleted,
+      webhooksDeleted,
+    };
   });
 
   console.log(
-    `Purged ${alertsDeleted} alerts, ${dashboardIds.length} dashboards, ` +
-      `${savedSearchIds.length} saved searches and ${webhooksDeleted} ` +
+    `Purged ${alertsDeleted} alerts, ${dashboardsDeleted} dashboards, ` +
+      `${savedSearchesDeleted} saved searches and ${webhooksDeleted} ` +
       `webhooks tagged "${tag}".`,
   );
 }
@@ -284,29 +295,24 @@ async function seed(count: number, tag: string) {
       'No team found — register an account in the dev app first, then re-run.',
     );
   }
-  const teamId = new mongoose.Types.ObjectId(team._id);
+  const teamId = team._id;
 
-  const source = await mongoose.connection
-    .collection('sources')
-    .findOne({ team: teamId, kind: 'log' });
+  const source = sources.list(teamId).find(row => row.kind === 'log');
   if (source == null) {
     throw new Error(`No log source found for team ${String(teamId)}.`);
   }
-  const sourceId = source._id as mongoose.Types.ObjectId;
+  const sourceId = source._id;
 
   const webhookName = seededWebhookName(tag);
-  const webhook = await Webhook.findOneAndUpdate(
-    { team: teamId, service: WebhookService.Generic, name: webhookName },
-    {
-      $setOnInsert: {
-        team: teamId,
-        service: WebhookService.Generic,
-        name: webhookName,
-        url: 'https://example.com/seeded-webhook',
-      },
-    },
-    { new: true, upsert: true },
-  );
+  const webhook =
+    webhooks
+      .list(teamId, WebhookService.Generic)
+      .find(row => row.name === webhookName) ??
+    webhooks.create(teamId, {
+      service: WebhookService.Generic,
+      name: webhookName,
+      url: 'https://example.com/seeded-webhook',
+    });
   const channel = {
     type: 'webhook' as const,
     webhookId: String(webhook._id),
@@ -351,8 +357,11 @@ async function seed(count: number, tag: string) {
     });
     remaining -= alerts;
   }
-  const savedSearchIds = await insertInChunks(
-    chunk => SavedSearch.insertMany(chunk),
+  const savedSearchIds = insertInChunks(
+    chunk =>
+      chunk.map(doc =>
+        savedSearches.create(teamId, doc as savedSearches.SavedSearchInput),
+      ),
     savedSearchPlans.map(plan => plan.doc),
   );
 
@@ -404,8 +413,11 @@ async function seed(count: number, tag: string) {
     });
     remaining -= alertedCount;
   }
-  const dashboardIds = await insertInChunks(
-    chunk => Dashboard.insertMany(chunk),
+  const dashboardIds = insertInChunks(
+    chunk =>
+      chunk.map(doc =>
+        dashboards.create(teamId, doc as dashboards.DashboardInput),
+      ),
     dashboardPlans.map(plan => plan.doc),
   );
 
@@ -425,7 +437,10 @@ async function seed(count: number, tag: string) {
     }
   }
 
-  await insertInChunks(chunk => Alert.insertMany(chunk), alertDocs);
+  insertInChunks(
+    chunk => chunk.map(doc => alerts.create(teamId, doc as alerts.AlertFields)),
+    alertDocs,
+  );
 
   const byState = new Map<string, number>();
   for (const alert of alertDocs) {
@@ -454,11 +469,7 @@ async function main() {
     console.log(USAGE);
     return;
   }
-  const mongoUri = args.mongoUri ?? process.env.MONGO_URI ?? devSlotMongoUri();
-
-  console.log(`Connecting to ${mongoUri}`);
-  await mongoose.connect(mongoUri, { serverSelectionTimeoutMS: 5000 });
-  openDb();
+  openDb(args.sqlitePath ?? undefined);
   migrate();
   try {
     if (args.purge) {
@@ -467,7 +478,6 @@ async function main() {
       await seed(args.count, args.tag);
     }
   } finally {
-    await mongoose.disconnect();
     closeDb();
   }
 }

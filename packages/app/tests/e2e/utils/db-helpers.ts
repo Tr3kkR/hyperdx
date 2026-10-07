@@ -1,59 +1,45 @@
-/**
- * Direct MongoDB and ClickHouse access helpers for full-stack E2E tests. Only usable in
- * full-stack mode (real Mongo via docker-compose) — there is no database in
- * local mode, so callers must gate on `{ tag: ['@full-stack'] }`.
- */
+/** Direct SQLite and ClickHouse access helpers for full-stack E2E tests. */
 import { execFileSync } from 'child_process';
-import fs from 'fs';
 import path from 'path';
 
 /**
- * Run a mongosh script against the e2e MongoDB container by piping the script
- * through stdin. Using stdin (rather than `--eval "<...>"`) avoids having to
- * escape quotes in the script body, so callers can pass multi-line JavaScript
- * with string literals verbatim.
- *
- * `execFileSync` with an argument array rather than a shell string: the project
- * slug comes from an env var, and with no shell nothing in it can be read as a
- * metacharacter.
- *
- * Throws if the docker-compose file can't be found (meaning we're not running
- * in the expected Docker-backed e2e environment).
+ * Run one named fixture operation through the API's normal openDb/migrate path.
+ * Passing JSON as an argument avoids shell quoting and SQL injection.
  */
-export function runMongoshScript(script: string): string {
-  const dockerComposeFile = path.join(__dirname, '..', 'docker-compose.yml');
-  if (!fs.existsSync(dockerComposeFile)) {
-    throw new Error(
-      `docker-compose.yml not found at ${dockerComposeFile} — e2e Docker stack unavailable`,
-    );
-  }
-
-  const e2eSlot = process.env.HDX_E2E_SLOT || '0';
-
+export function runSqliteFixture(
+  action: string,
+  input: Record<string, unknown> = {},
+): string {
+  const apiDir = path.resolve(__dirname, '../../../../api');
   return execFileSync(
-    'docker',
+    process.execPath,
     [
-      'compose',
-      '-p',
-      `e2e-${e2eSlot}`,
-      '-f',
-      dockerComposeFile,
-      'exec',
-      '-T',
-      'db',
-      'mongosh',
-      '--quiet',
+      '-r',
+      'ts-node/register/transpile-only',
+      '-r',
+      'tsconfig-paths/register',
+      'scripts/e2e-db.ts',
+      action,
+      JSON.stringify(input),
     ],
     {
       encoding: 'utf-8',
-      stdio: ['pipe', 'pipe', 'pipe'],
-      input: script,
+      cwd: apiDir,
+      env: {
+        ...process.env,
+        SQLITE_PATH:
+          process.env.SQLITE_PATH ||
+          path.join(
+            apiDir,
+            `hyperdx-e2e-${process.env.HDX_E2E_SLOT || '0'}.db`,
+          ),
+      },
     },
   );
 }
 
 /**
- * Sets a boolean field directly on the (single, seeded) e2e team document.
+ * Sets a boolean field directly on the (single, seeded) e2e team row.
  * There's no settings UI or API endpoint for team feature flags yet, so
  * direct DB writes are the only way to toggle them for a test.
  *
@@ -65,10 +51,7 @@ export function runMongoshScript(script: string): string {
  * `fullyParallel: true` lets tests in the same file run concurrently.
  */
 export function setTeamFlag(flagName: string, value: boolean): void {
-  runMongoshScript(`
-use('hyperdx-e2e');
-db.teams.updateOne({}, { $set: { [${JSON.stringify(flagName)}]: ${JSON.stringify(value)} } });
-`);
+  runSqliteFixture('set-team-flag', { flag: flagName, value });
 }
 
 const CLICKHOUSE_HOST =

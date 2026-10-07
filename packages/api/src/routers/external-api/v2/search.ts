@@ -1,8 +1,8 @@
 import { ClickHouseQueryError } from '@hyperdx/common-utils/dist/clickhouse';
 import express from 'express';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 
+import { isId } from '@/db/ids';
 import { parseTimeRange } from '@/mcp/tools/query/helpers';
 import { getNonNullUserWithTeam } from '@/middleware/auth';
 import { processRequestWithEnhancedErrors as validateRequest } from '@/utils/enhancedErrors';
@@ -166,7 +166,7 @@ const searchRequestSchema = z.object({
   sourceId: z
     .string()
     .min(1, { message: 'sourceId is required' })
-    .refine(val => ObjectId.isValid(val), {
+    .refine(val => isId(val), {
       message: 'sourceId must be a valid ObjectId',
     })
     .describe(

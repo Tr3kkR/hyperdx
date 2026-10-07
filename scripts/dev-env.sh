@@ -57,7 +57,6 @@ cat > "${HDX_DEV_SLOTS_DIR}/${HDX_DEV_SLOT}.json" <<EOF
   "apiPort": ${HYPERDX_API_PORT},
   "appPort": ${HYPERDX_APP_PORT},
   "opampPort": ${HYPERDX_OPAMP_PORT},
-  "mongoPort": ${HDX_DEV_MONGO_PORT},
   "chHttpPort": ${HDX_DEV_CH_HTTP_PORT},
   "chNativePort": ${HDX_DEV_CH_NATIVE_PORT},
   "otelHttpPort": ${HDX_DEV_OTEL_HTTP_PORT},

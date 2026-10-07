@@ -5,8 +5,8 @@ import {
   SourceKind,
   TSource,
 } from '@hyperdx/common-utils/dist/types';
+import { ObjectId } from 'bson';
 import { omit } from 'lodash';
-import mongoose, { Types } from 'mongoose';
 
 import { getDb } from '@/db';
 import * as alertsRepo from '@/db/repos/alerts';
@@ -84,6 +84,8 @@ describe('dashboard router', () => {
       .expect(200);
     expect(dashboard.body.name).toBe(MOCK_DASHBOARD.name);
     expect(dashboard.body.tiles.length).toBe(MOCK_DASHBOARD.tiles.length);
+    expect(dashboard.body.savedFilterValues).toEqual([]);
+    expect(dashboard.body.containers).toEqual([]);
     expect(dashboard.body.tiles.map(tile => tile.id)).toEqual(
       MOCK_DASHBOARD.tiles.map(tile => tile.id),
     );
@@ -226,7 +228,7 @@ describe('dashboard router', () => {
 
   it('returns 404 when patching a missing dashboard', async () => {
     await agent
-      .patch(`/dashboards/${new mongoose.Types.ObjectId()}`)
+      .patch(`/dashboards/${new ObjectId()}`)
       .send({ name: 'Missing Dashboard' })
       .expect(404);
   });
@@ -655,7 +657,7 @@ describe('dashboard router', () => {
   });
 
   it('alert on a tile only appears on the dashboard that owns it, not on another dashboard with the same tile ID', async () => {
-    const sharedTileId = new mongoose.Types.ObjectId().toHexString();
+    const sharedTileId = new ObjectId().toHexString();
     const mockAlert = makeMockAlert(webhook._id.toString());
 
     // Create dashboard A with an alert on the tile
@@ -725,7 +727,7 @@ describe('dashboard router', () => {
     }
 
     // Set the original creator to a different user
-    const originalCreatorId = new mongoose.Types.ObjectId();
+    const originalCreatorId = new ObjectId().toString();
     alertsRepo.update(originalAlert.id, team._id, {
       createdBy: originalCreatorId,
     });
@@ -783,11 +785,11 @@ describe('dashboard router', () => {
 
   describe('dashboard filter variable fields', () => {
     const makeVariableFilter = (overrides = {}) => ({
-      id: new Types.ObjectId().toString(),
+      id: new ObjectId().toString(),
       type: 'QUERY_EXPRESSION' as const,
       name: 'Service Name',
       expression: 'ServiceName',
-      source: new Types.ObjectId().toString(),
+      source: new ObjectId().toString(),
       isBroadcastEnabled: false,
       isVariableEnabled: true,
       variableName: 'Service_Name',
@@ -812,11 +814,11 @@ describe('dashboard router', () => {
       // Absence is meaningful: `isBroadcastEnabled` is read as enabled when
       // missing, so the server must not materialize a value on the way in.
       const filter = {
-        id: new Types.ObjectId().toString(),
+        id: new ObjectId().toString(),
         type: 'QUERY_EXPRESSION' as const,
         name: 'Service Name',
         expression: 'ServiceName',
-        source: new Types.ObjectId().toString(),
+        source: new ObjectId().toString(),
       };
 
       const created = await agent
@@ -974,11 +976,11 @@ describe('dashboard router', () => {
       // two filters that legitimately share a display name on different sources.
       it('accepts identically named filters that carry no variable fields', async () => {
         const legacyFilter = {
-          id: new Types.ObjectId().toString(),
+          id: new ObjectId().toString(),
           type: 'QUERY_EXPRESSION' as const,
           name: 'Service Name',
           expression: 'ServiceName',
-          source: new Types.ObjectId().toString(),
+          source: new ObjectId().toString(),
         };
 
         await agent
@@ -987,7 +989,7 @@ describe('dashboard router', () => {
             ...MOCK_DASHBOARD,
             filters: [
               legacyFilter,
-              { ...legacyFilter, id: new Types.ObjectId().toString() },
+              { ...legacyFilter, id: new ObjectId().toString() },
             ],
           })
           .expect(200);
@@ -1162,11 +1164,11 @@ describe('dashboard router', () => {
 
   describe('required filters', () => {
     const makeFilter = (overrides = {}) => ({
-      id: new Types.ObjectId().toString(),
+      id: new ObjectId().toString(),
       type: 'QUERY_EXPRESSION' as const,
       name: 'Service Name',
       expression: 'ServiceName',
-      source: new Types.ObjectId().toString(),
+      source: new ObjectId().toString(),
       ...overrides,
     });
 
@@ -1272,7 +1274,7 @@ describe('dashboard router', () => {
 
   describe('static-list filters', () => {
     const makeStaticFilter = (overrides = {}) => ({
-      id: new Types.ObjectId().toString(),
+      id: new ObjectId().toString(),
       type: 'STATIC_LIST' as const,
       name: 'Environment',
       options: ['prod', 'staging', 'dev'],
@@ -1348,11 +1350,11 @@ describe('dashboard router', () => {
           filters: [
             makeStaticFilter(),
             {
-              id: new Types.ObjectId().toString(),
+              id: new ObjectId().toString(),
               type: 'QUERY_EXPRESSION' as const,
               name: 'Service',
               expression: 'ServiceName',
-              source: new Types.ObjectId().toString(),
+              source: new ObjectId().toString(),
             },
           ],
         })
@@ -1441,11 +1443,11 @@ describe('dashboard router', () => {
             ...MOCK_DASHBOARD,
             filters: [
               {
-                id: new Types.ObjectId().toString(),
+                id: new ObjectId().toString(),
                 type: 'QUERY_EXPRESSION' as const,
                 name: 'Service',
                 expression: 'ServiceName',
-                source: new Types.ObjectId().toString(),
+                source: new ObjectId().toString(),
                 [field]: undefined,
               },
             ],
@@ -1465,7 +1467,7 @@ describe('dashboard router', () => {
         kind: SourceKind.Promql,
         name: 'Test PromQL Source',
         team: team._id,
-        connection: new Types.ObjectId().toString(),
+        connection: new ObjectId().toString(),
         from: { databaseName: 'test_db', tableName: 'timeseries_table' },
         timestampValueExpression: 'timestamp',
       });
@@ -1478,7 +1480,7 @@ describe('dashboard router', () => {
     });
 
     const makePromqlFilter = (overrides = {}) => ({
-      id: new Types.ObjectId().toString(),
+      id: new ObjectId().toString(),
       type: 'PROMETHEUS_LABEL' as const,
       name: 'Pod',
       source: promqlSourceId,
@@ -1577,7 +1579,7 @@ describe('dashboard router', () => {
     // this route, a bad id is rejected rather than saved.
     describe('source validation', () => {
       it('rejects a filter naming a source that does not exist', async () => {
-        const source = new Types.ObjectId().toString();
+        const source = new ObjectId().toString();
 
         const response = await agent
           .post('/dashboards')
@@ -1592,7 +1594,7 @@ describe('dashboard router', () => {
           kind: SourceKind.Log,
           name: 'Test Log Source',
           team: team._id,
-          connection: new Types.ObjectId().toString(),
+          connection: new ObjectId().toString(),
           from: { databaseName: 'test_db', tableName: 'logs_table' },
           timestampValueExpression: 'timestamp',
           defaultTableSelectExpression: 'body',
@@ -1615,8 +1617,8 @@ describe('dashboard router', () => {
         const otherTeamSource = await createSourceFixture({
           kind: SourceKind.Promql,
           name: 'Other Team PromQL Source',
-          team: new Types.ObjectId(),
-          connection: new Types.ObjectId().toString(),
+          team: new ObjectId(),
+          connection: new ObjectId().toString(),
           from: { databaseName: 'test_db', tableName: 'timeseries_table' },
           timestampValueExpression: 'timestamp',
         });
@@ -1642,7 +1644,7 @@ describe('dashboard router', () => {
         await agent
           .patch(`/dashboards/${created.body.id}`)
           .send({
-            filters: [{ ...filter, source: new Types.ObjectId().toString() }],
+            filters: [{ ...filter, source: new ObjectId().toString() }],
           })
           .expect(400);
 
@@ -1696,7 +1698,7 @@ describe('dashboard router', () => {
           .send(MOCK_DASHBOARD)
           .expect(200);
 
-        const source = new Types.ObjectId().toString();
+        const source = new ObjectId().toString();
         const response = await agent
           .patch(`/dashboards/${created.body.id}`)
           .send({ filters: [makePromqlFilter({ source })] })
@@ -1708,7 +1710,7 @@ describe('dashboard router', () => {
       // Converting a filter to this type is the same as adding one, as far as
       // the gate is concerned: its source has never been through it.
       it('still rejects a filter PATCHed over from another type', async () => {
-        const id = new Types.ObjectId().toString();
+        const id = new ObjectId().toString();
         const created = await agent
           .post('/dashboards')
           .send({
@@ -1729,7 +1731,7 @@ describe('dashboard router', () => {
           kind: SourceKind.Log,
           name: 'Converted Log Source',
           team: team._id,
-          connection: new Types.ObjectId().toString(),
+          connection: new ObjectId().toString(),
           from: { databaseName: 'test_db', tableName: 'logs_table' },
           timestampValueExpression: 'timestamp',
           defaultTableSelectExpression: 'body',
@@ -1754,11 +1756,11 @@ describe('dashboard router', () => {
             ...MOCK_DASHBOARD,
             filters: [
               {
-                id: new Types.ObjectId().toString(),
+                id: new ObjectId().toString(),
                 type: 'QUERY_EXPRESSION' as const,
                 name: 'Service',
                 expression: 'ServiceName',
-                source: new Types.ObjectId().toString(),
+                source: new ObjectId().toString(),
               },
             ],
           })
@@ -1774,11 +1776,11 @@ describe('dashboard router', () => {
           filters: [
             makePromqlFilter({ variableName: 'pod' }),
             {
-              id: new Types.ObjectId().toString(),
+              id: new ObjectId().toString(),
               type: 'QUERY_EXPRESSION' as const,
               name: 'Pod (logs)',
               expression: 'PodName',
-              source: new Types.ObjectId().toString(),
+              source: new ObjectId().toString(),
               isVariableEnabled: true,
               variableName: 'pod',
             },
@@ -1792,7 +1794,7 @@ describe('dashboard router', () => {
     const MOCK_SOURCE: Omit<Extract<TSource, { kind: 'log' }>, 'id'> = {
       kind: SourceKind.Log,
       name: 'Test Source',
-      connection: new Types.ObjectId().toString(),
+      connection: new ObjectId().toString(),
       from: {
         databaseName: 'test_db',
         tableName: 'test_table',
@@ -1810,13 +1812,13 @@ describe('dashboard router', () => {
 
     const createPresetFilter = (
       input: typeof MOCK_PRESET_DASHBOARD_FILTER & {
-        team: string | Types.ObjectId;
-        source: string | Types.ObjectId;
+        team: string | ObjectId;
+        source: string | ObjectId;
       },
     ) =>
       presetFilters.create(String(input.team), {
         ...input,
-        id: new Types.ObjectId().toString(),
+        id: new ObjectId().toString(),
         source: String(input.source),
       });
 
@@ -1891,7 +1893,7 @@ describe('dashboard router', () => {
       });
 
       it('does not return filters from other teams in GET', async () => {
-        const team2 = new mongoose.Types.ObjectId();
+        const team2 = new ObjectId();
 
         const source1 = await createSourceFixture({
           ...MOCK_SOURCE,
@@ -1934,7 +1936,7 @@ describe('dashboard router', () => {
 
         const filterInput = {
           ...MOCK_PRESET_DASHBOARD_FILTER,
-          id: new Types.ObjectId().toString(),
+          id: new ObjectId().toString(),
           source: source._id.toString(),
         };
 
@@ -1974,7 +1976,7 @@ describe('dashboard router', () => {
 
         const filterInput = {
           ...MOCK_PRESET_DASHBOARD_FILTER,
-          id: new Types.ObjectId().toString(),
+          id: new ObjectId().toString(),
           source: source._id.toString(),
           sourceMetricType: MetricsDataType.Gauge,
         };
@@ -1995,7 +1997,7 @@ describe('dashboard router', () => {
 
         const filterInput = {
           ...MOCK_PRESET_DASHBOARD_FILTER,
-          id: new Types.ObjectId().toString(),
+          id: new ObjectId().toString(),
           source: source._id.toString(),
           presetDashboard: PresetDashboard.Services,
         };
@@ -2014,7 +2016,7 @@ describe('dashboard router', () => {
           .post(`/dashboards/preset/${PresetDashboard.Services}/filter`)
           .send({
             filter: {
-              id: new Types.ObjectId().toString(),
+              id: new ObjectId().toString(),
               type: 'STATIC_LIST',
               name: 'Environment',
               options: ['prod', 'staging', 'dev'],
@@ -2046,7 +2048,7 @@ describe('dashboard router', () => {
             .send({
               filter: {
                 ...MOCK_PRESET_DASHBOARD_FILTER,
-                id: new Types.ObjectId().toString(),
+                id: new ObjectId().toString(),
                 source: source._id.toString(),
                 [field]: undefined,
               },
@@ -2127,7 +2129,7 @@ describe('dashboard router', () => {
         });
 
         const newFilterInput = {
-          id: new Types.ObjectId().toString(),
+          id: new ObjectId().toString(),
           name: 'New Filter',
           type: MOCK_PRESET_DASHBOARD_FILTER.type,
           expression: 'service.name:new-service',
@@ -2178,7 +2180,7 @@ describe('dashboard router', () => {
         });
 
         const filterInput = {
-          id: new Types.ObjectId().toString(),
+          id: new ObjectId().toString(),
           name: 'Test Filter',
           type: MOCK_PRESET_DASHBOARD_FILTER.type,
           expression: 'test',
@@ -2195,7 +2197,7 @@ describe('dashboard router', () => {
 
       it('returns 400 when filter is missing required fields', async () => {
         const incompleteFilter = {
-          id: new Types.ObjectId().toString(),
+          id: new ObjectId().toString(),
           name: 'Test Filter',
           // Missing type, expression, presetDashboard, source
         };
@@ -2237,7 +2239,7 @@ describe('dashboard router', () => {
       });
 
       it('returns 404 when filter does not exist', async () => {
-        const nonExistentId = new Types.ObjectId().toString();
+        const nonExistentId = new ObjectId().toString();
 
         await agent
           .delete(
@@ -2253,7 +2255,7 @@ describe('dashboard router', () => {
       });
 
       it('returns 400 for invalid preset dashboard type', async () => {
-        const filterId = new Types.ObjectId().toString();
+        const filterId = new ObjectId().toString();
 
         await agent
           .delete(`/dashboards/preset/invalid-dashboard/filter/${filterId}`)
@@ -2261,7 +2263,7 @@ describe('dashboard router', () => {
       });
 
       it('does not delete filters from other teams', async () => {
-        const team2Id = new mongoose.Types.ObjectId();
+        const team2Id = new ObjectId();
 
         const source = await createSourceFixture({
           ...MOCK_SOURCE,

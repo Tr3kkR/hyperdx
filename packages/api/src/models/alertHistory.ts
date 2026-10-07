@@ -1,13 +1,8 @@
-import {
-  AlertErrorType,
-  AlertNotificationTargetTiming,
-} from '@hyperdx/common-utils/dist/types';
-import mongoose, { Schema } from 'mongoose';
-import ms from 'ms';
+import { AlertNotificationTargetTiming } from '@hyperdx/common-utils/dist/types';
 
 import { AlertState, IAlertError } from '@/models/alert';
 
-import type { ObjectId } from '.';
+import type { ObjectId } from './ids';
 
 /**
  * Diagnostics for the evaluation that wrote a history record.
@@ -49,96 +44,3 @@ export interface IAlertHistory {
   /** Diagnostics for the evaluation that wrote this record. */
   analytics?: IAlertHistoryAnalytics;
 }
-
-const AlertHistorySchema = new Schema<IAlertHistory>({
-  counts: {
-    type: Number,
-    default: 0,
-  },
-  createdAt: {
-    type: Date,
-    required: true,
-  },
-  alert: { type: mongoose.Schema.Types.ObjectId, ref: 'Alert' },
-  state: {
-    type: String,
-    enum: Object.values(AlertState),
-    required: true,
-  },
-  lastValues: [
-    {
-      startTime: {
-        type: Date,
-        required: true,
-      },
-      count: {
-        type: Number,
-        required: true,
-      },
-    },
-  ],
-  group: {
-    type: String,
-    required: false,
-  },
-  fired: {
-    type: Boolean,
-    required: false,
-  },
-  errors: {
-    type: [
-      {
-        _id: false,
-        timestamp: { type: Date, required: true },
-        type: {
-          type: String,
-          enum: AlertErrorType,
-          required: true,
-        },
-        message: { type: String, required: true },
-      },
-    ],
-    required: false,
-    default: undefined,
-  },
-  analytics: {
-    type: {
-      _id: false,
-      queryDurationMs: { type: Number, required: false },
-      webhookDurationMs: { type: Number, required: false },
-      backfilledBuckets: { type: Number, required: false },
-      notificationTargets: {
-        type: [
-          {
-            _id: false,
-            targetId: { type: String, required: true },
-            target: { type: String, required: true },
-            durationMs: { type: Number, required: true },
-            dispatches: { type: Number, required: true },
-            failures: { type: Number, required: true },
-          },
-        ],
-        required: false,
-        default: undefined,
-      },
-    },
-    required: false,
-    default: undefined,
-  },
-});
-
-AlertHistorySchema.index(
-  { createdAt: 1 },
-  { expireAfterSeconds: ms('30d') / 1000 },
-);
-
-// Used by getRecentAlertHistories (matches on alert, sorts by createdAt)
-AlertHistorySchema.index({ alert: 1, createdAt: -1 });
-
-// Used by getPreviousAlertHistories (groups by {alert, group}, sorts by createdAt)
-AlertHistorySchema.index({ alert: 1, group: 1, createdAt: -1 });
-
-export default mongoose.model<IAlertHistory>(
-  'AlertHistory',
-  AlertHistorySchema,
-);

@@ -1,5 +1,4 @@
 import { SourceSchemaNoId } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
 
 import * as config from '@/config';
 import { validateConnectionId } from '@/controllers/connection';
@@ -46,12 +45,10 @@ export function registerSaveSource({
         if (idError) return idError;
       }
 
-      // Reject a connection that isn't a valid ObjectId owned by this team
-      // (createSource/updateSource don't check, so this avoids a 500 CastError
-      // or a cross-team credential reference).
+      // Reject a connection that is not owned by this team.
       const connectionCheck = await validateConnectionId(
         input.connection,
-        new mongoose.Types.ObjectId(teamId),
+        teamId,
       );
       if (!connectionCheck.ok) {
         return mcpUserError(connectionCheck.message);
@@ -95,8 +92,6 @@ export function registerSaveSource({
         // server error returned without leaking raw internal detail.
         const message = e instanceof Error ? e.message : String(e);
         if (
-          e instanceof mongoose.Error.ValidationError ||
-          e instanceof mongoose.Error.CastError ||
           isDuplicateKeyError(e) ||
           message.startsWith('Invalid source data')
         ) {

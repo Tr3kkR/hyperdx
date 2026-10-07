@@ -1,7 +1,7 @@
 import * as alertsRepo from '@/db/repos/alerts';
 import * as webhooksRepo from '@/db/repos/webhooks';
 import { WebhookService } from '@/db/repos/webhooks';
-import type { ObjectId } from '@/models';
+import type { ObjectId } from '@/models/ids';
 import { validateWebhookUrl } from '@/utils/validators';
 
 export interface WebhookInput {

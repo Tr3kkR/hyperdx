@@ -1,5 +1,5 @@
 import { AlertThresholdType } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import * as User from '@/db/repos/users';
 import type { WebhookDoc } from '@/db/repos/webhooks';
@@ -114,7 +114,7 @@ describe('alerts list paging and filtering', () => {
     it('still populates the referenced dashboard, saved search and creator', async () => {
       const savedSearch = await createSavedSearchFixture({
         name: 'Checkout errors',
-        source: new mongoose.Types.ObjectId(),
+        source: new ObjectId(),
         team: team._id,
         tags: ['checkout'],
       });
@@ -295,7 +295,7 @@ describe('alerts list paging and filtering', () => {
     it('filters a saved-search alert by source', async () => {
       const savedSearch = await createSavedSearchFixture({
         name: 'Legacy search',
-        source: new mongoose.Types.ObjectId(),
+        source: new ObjectId(),
         team: team._id,
       });
       const legacy = await createAlert({

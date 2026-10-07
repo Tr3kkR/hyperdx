@@ -1,12 +1,4 @@
 receivers:
-  mongodb:
-    hosts:
-      - endpoint: db:27017
-    collection_interval: 5s
-    initial_delay: 1s
-    tls:
-      insecure: true
-      insecure_skip_verify: true
   hostmetrics:
     collection_interval: 5s
     scrapers:
@@ -30,5 +22,5 @@ service:
       level: ${env:HYPERDX_LOG_LEVEL}
   pipelines:
     metrics:
-      receivers: [mongodb, hostmetrics]
+      receivers: [hostmetrics]
       exporters: [otlphttp, logging]

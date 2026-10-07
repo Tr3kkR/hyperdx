@@ -1,8 +1,9 @@
 import { SourceKind } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 import request, { SuperAgentTest } from 'supertest';
 
 import * as config from '@/config';
+import { getDb } from '@/db';
 import type { TeamDoc as ITeam } from '@/db/repos/teams';
 import type { UserDoc as IUser } from '@/db/repos/users';
 import {
@@ -11,7 +12,7 @@ import {
   getLoggedInAgent,
   getServer,
 } from '@/fixtures';
-import Alert, { AlertSource, AlertState } from '@/models/alert';
+import { AlertSource, AlertState } from '@/models/alert';
 import { createAlertFixture } from '@/test/sqliteMetadata';
 import {
   createSavedSearchFixture,
@@ -85,9 +86,9 @@ describe('External API v2 Saved Searches CRUD', () => {
 
   const createOtherTeamSavedSearch = () =>
     createSavedSearchFixture({
-      team: new mongoose.Types.ObjectId(),
+      team: new ObjectId(),
       name: 'Other Team Search',
-      source: new mongoose.Types.ObjectId(),
+      source: new ObjectId(),
       whereLanguage: 'lucene',
     });
 
@@ -119,7 +120,7 @@ describe('External API v2 Saved Searches CRUD', () => {
     });
 
     it('should reject a sourceId that does not belong to the team', async () => {
-      const otherSourceId = new mongoose.Types.ObjectId().toString();
+      const otherSourceId = new ObjectId().toString();
       const response = await authRequest('post', BASE_URL)
         .send({ ...savedSearchBody(), sourceId: otherSourceId })
         .expect(400);
@@ -132,12 +133,12 @@ describe('External API v2 Saved Searches CRUD', () => {
       // the lookup to the caller's team, preventing cross-team references.
       const otherTeamSource = await createSourceFixture({
         kind: SourceKind.Log,
-        team: new mongoose.Types.ObjectId(),
+        team: new ObjectId(),
         name: 'Other Team Logs',
         from: { databaseName: DEFAULT_DATABASE, tableName: DEFAULT_LOGS_TABLE },
         timestampValueExpression: 'Timestamp',
         defaultTableSelectExpression: 'Timestamp, Body',
-        connection: new mongoose.Types.ObjectId(),
+        connection: new ObjectId(),
       });
       const response = await authRequest('post', BASE_URL)
         .send({
@@ -511,7 +512,7 @@ describe('External API v2 Saved Searches CRUD', () => {
         .send(savedSearchBody())
         .expect(200);
 
-      const otherSourceId = new mongoose.Types.ObjectId().toString();
+      const otherSourceId = new ObjectId().toString();
       const response = await authRequest(
         'put',
         `${BASE_URL}/${created.body.data.id}`,
@@ -561,9 +562,13 @@ describe('External API v2 Saved Searches CRUD', () => {
 
       expect(await findSavedSearchFixture(savedSearchId)).toBeNull();
       // Dependent alerts must not be orphaned.
-      expect(await Alert.countDocuments({ savedSearch: savedSearchId })).toBe(
-        0,
-      );
+      expect(
+        (
+          getDb()
+            .prepare('SELECT count(*) AS n FROM alerts WHERE savedSearch=?')
+            .get(savedSearchId) as { n: number }
+        ).n,
+      ).toBe(0);
     });
   });
 });

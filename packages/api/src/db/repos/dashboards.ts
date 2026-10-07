@@ -39,6 +39,8 @@ function fromRow(
   const doc = rowToDoc(row, spec);
   doc.tags ??= [];
   doc.filters ??= [];
+  doc.savedFilterValues ??= [];
+  doc.containers ??= [];
   return doc as DashboardDoc;
 }
 
@@ -205,13 +207,11 @@ export function create(
       JSON.stringify(input.filters ?? []),
       input.savedQuery ?? null,
       input.savedQueryLanguage ?? null,
-      input.savedFilterValues == null
-        ? null
-        : JSON.stringify(input.savedFilterValues),
+      JSON.stringify(input.savedFilterValues ?? []),
       input.savedDateRange == null
         ? null
         : JSON.stringify(input.savedDateRange),
-      input.containers == null ? null : JSON.stringify(input.containers),
+      JSON.stringify(input.containers ?? []),
       input.createdBy == null ? null : normalizeId(input.createdBy),
       input.updatedBy == null ? null : normalizeId(input.updatedBy),
       input.provisioned ? 1 : 0,

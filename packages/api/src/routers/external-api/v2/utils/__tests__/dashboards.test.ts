@@ -4,7 +4,7 @@ import {
 } from '@hyperdx/common-utils/dist/dashboardValidation';
 import { isBuilderSavedChartConfig } from '@hyperdx/common-utils/dist/guards';
 import { DisplayType, MetricsDataType } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 import { z } from 'zod';
 
 import { DashboardDocument } from '@/models/dashboard';
@@ -290,7 +290,7 @@ describe('collectTileContainerRefIssues', () => {
 // tests are about.
 function makeDoc(overrides: Record<string, unknown> = {}): DashboardDocument {
   return {
-    _id: new mongoose.Types.ObjectId(),
+    _id: new ObjectId(),
     name: 'Test',
     tiles: [],
     tags: [],
@@ -417,7 +417,7 @@ describe('convertToExternalDashboard orphan-ref heal', () => {
               id: 'series-limit-tile',
               config: {
                 displayType,
-                source: new mongoose.Types.ObjectId().toString(),
+                source: new ObjectId().toString(),
                 name: 'Series limit tile',
                 select: [{ aggFn: 'count', valueExpression: '' }],
                 where: '',
@@ -462,7 +462,7 @@ describe('convertToExternalDashboard stale aggregation params', () => {
         makeTile({
           config: {
             displayType: DisplayType.Line,
-            source: new mongoose.Types.ObjectId().toString(),
+            source: new ObjectId().toString(),
             where: '',
             select,
             name: 'Tile',
@@ -588,7 +588,7 @@ describe('externalDashboardSelectItemSchema metric selects', () => {
         makeTile({
           config: {
             displayType: DisplayType.Line,
-            source: new mongoose.Types.ObjectId().toString(),
+            source: new ObjectId().toString(),
             where: '',
             name: 'Metric tile',
             select: [

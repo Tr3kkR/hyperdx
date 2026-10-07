@@ -34,13 +34,13 @@ import {
   zAlertChannel,
   zAlertChannels,
 } from '@hyperdx/common-utils/dist/types';
-import { Types } from 'mongoose';
 import { z } from 'zod';
 
+import { isId } from '@/db/ids';
 import { AlertSource } from '@/models/alert';
 
 export const objectIdSchema = z.string().refine(val => {
-  return Types.ObjectId.isValid(val);
+  return isId(val);
 }, 'Invalid ObjectId');
 
 /**

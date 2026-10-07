@@ -54,8 +54,8 @@ types, so a single import is usually enough.
 
 ### Tracing
 
-Rely on the HyperDX SDK auto-instrumentation (HTTP, Express, Mongo, etc.) for
-the common path. Add a **manual span only for a meaningful unit of work** that
+Rely on the HyperDX SDK auto-instrumentation (HTTP, Express, etc.) for
+the common path. SQLite does not produce database spans automatically. Add a **manual span only for a meaningful unit of work** that
 auto-instrumentation can't see - a background job step, a fan-out, an expensive
 computation, an external tool invocation.
 

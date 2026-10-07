@@ -12,7 +12,6 @@ import { closeDb, openDb } from '@/db';
 import { migrate } from '@/db/migrate';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import * as teams from '@/db/repos/teams';
-import { connectDB, mongooseConnection } from '@/models';
 import type { HdxTask } from '@/tasks/types';
 import { ProvisionDashboardsTaskArgs } from '@/tasks/types';
 import logger from '@/utils/logger';
@@ -111,7 +110,6 @@ export default class ProvisionDashboardsTask implements HdxTask {
   async execute(): Promise<void> {
     openDb();
     migrate();
-    await connectDB();
 
     const dir = process.env.DASHBOARD_PROVISIONER_DIR;
     if (!dir) {
@@ -168,7 +166,6 @@ export default class ProvisionDashboardsTask implements HdxTask {
   }
 
   async asyncDispose(): Promise<void> {
-    await mongooseConnection.close();
     closeDb();
   }
 }

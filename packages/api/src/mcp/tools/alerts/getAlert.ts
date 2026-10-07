@@ -1,5 +1,4 @@
 import { type AlertInterval } from '@hyperdx/common-utils/dist/types';
-import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 
 import * as config from '@/config';
@@ -106,7 +105,7 @@ export function registerGetAlert({
         translateAlertDocumentToExternalAlertWithChartConfig(populated);
 
       const history = await getRecentAlertHistories({
-        alertId: new ObjectId(alert._id),
+        alertId: alert._id,
         interval: alert.interval as AlertInterval,
         limit: 20,
       });

@@ -1,7 +1,7 @@
 import type { PinnedFiltersValue } from '@hyperdx/common-utils/dist/types';
 
 import * as pinnedFilters from '@/db/repos/pinnedFilters';
-import type { ObjectId } from '@/models';
+import type { ObjectId } from '@/models/ids';
 
 /**
  * Get team-level pinned filters for a team+source combination.

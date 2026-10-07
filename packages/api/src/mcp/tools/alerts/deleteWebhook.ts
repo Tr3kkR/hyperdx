@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import { z } from 'zod';
 
 import { deleteWebhook } from '@/controllers/webhook';
@@ -26,10 +25,7 @@ export function registerDeleteWebhook({
       }),
     },
     async ({ id: webhookId }) => {
-      const result = await deleteWebhook(
-        new mongoose.Types.ObjectId(teamId),
-        webhookId,
-      );
+      const result = await deleteWebhook(teamId, webhookId);
 
       if (result.status === 'referenced') {
         return mcpUserError(

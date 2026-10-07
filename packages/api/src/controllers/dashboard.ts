@@ -19,8 +19,8 @@ import type { AlertDoc } from '@/db/repos/alerts';
 import type { DashboardDoc } from '@/db/repos/dashboards';
 import * as dashboardsRepo from '@/db/repos/dashboards';
 import { hydrateUsers } from '@/db/repos/users';
-import type { ObjectId } from '@/models';
 import type { AlertDocument, IAlert } from '@/models/alert';
+import type { ObjectId } from '@/models/ids';
 import { resolveAlertDisplayFields } from '@/utils/alerts';
 
 function pickAlertsByTile(tiles: Tile[]) {

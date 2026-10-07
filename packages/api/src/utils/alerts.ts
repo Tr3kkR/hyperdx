@@ -11,10 +11,9 @@ import {
   DisplayType,
   SavedChartConfig,
 } from '@hyperdx/common-utils/dist/types';
-import { Types } from 'mongoose';
 
-import type { ObjectId } from '@/models';
 import { AlertSource } from '@/models/alert';
+import type { ObjectId } from '@/models/ids';
 
 import logger from './logger';
 
@@ -112,23 +111,26 @@ function normalizeTags(value: unknown): string[] {
 }
 
 /**
- * A Mongoose ref field is either a bare ObjectId or, when the query populated
- * it, the referenced document. Documents don't override toString(), so an
+ * A reference may be a bare id or a hydrated entity. Entities don't override toString(), so an
  * unguarded `.toString()` on a populated ref silently yields "[object Object]".
  */
 export function isPopulatedRef(ref: unknown): ref is { _id: ObjectId } {
-  return typeof ref === 'object' && ref !== null && '_id' in ref;
+  return (
+    typeof ref === 'object' &&
+    ref !== null &&
+    '_id' in ref &&
+    !('_bsontype' in ref)
+  );
 }
 
 /**
  * The populated document when the ref field was populated, null otherwise.
- * The instanceof check is for the type system: the predicate alone can't
- * remove the bare-ObjectId branch from the union.
+ * A BSON id may expose `_id` itself, so exclude BSON objects explicitly.
  */
 export function populatedRefOrNull<T extends { _id: ObjectId }>(
   ref: ObjectId | T | null | undefined,
 ): T | null {
-  return isPopulatedRef(ref) && !(ref instanceof Types.ObjectId) ? ref : null;
+  return isPopulatedRef(ref) ? (ref as T) : null;
 }
 
 /**

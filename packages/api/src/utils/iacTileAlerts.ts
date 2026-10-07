@@ -2,8 +2,8 @@ import { isTileAlertUnaddressable } from '@hyperdx/common-utils/dist/iac';
 import { serializeError } from 'serialize-error';
 
 import * as dashboardsRepo from '@/db/repos/dashboards';
-import type { ObjectId } from '@/models';
 import { AlertSource } from '@/models/alert';
+import type { ObjectId } from '@/models/ids';
 import { getCounter } from '@/utils/instrumentation';
 import logger from '@/utils/logger';
 

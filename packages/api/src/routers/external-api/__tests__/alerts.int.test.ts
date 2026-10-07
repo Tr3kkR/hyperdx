@@ -1,8 +1,9 @@
 import { AlertErrorType, SourceKind } from '@hyperdx/common-utils/dist/types';
+import { ObjectId } from 'bson';
 import _ from 'lodash';
-import { ObjectId } from 'mongodb';
 import request from 'supertest';
 
+import * as dashboardsRepo from '@/db/repos/dashboards';
 import { WebhookService } from '@/db/repos/webhooks';
 import {
   getLoggedInAgent,
@@ -11,7 +12,6 @@ import {
   RAW_SQL_NUMBER_ALERT_TEMPLATE,
 } from '@/fixtures';
 import { AlertSource, AlertThresholdType } from '@/models/alert';
-import Dashboard from '@/models/dashboard';
 import { createAlertFixture, findAlertFixture } from '@/test/sqliteMetadata';
 import { createDashboardFixture } from '@/test/sqliteMetadata';
 import { setAlertExecutionErrorsFixture } from '@/test/sqliteMetadata';
@@ -407,7 +407,7 @@ describe('External API Alerts', () => {
       const created = await authRequest('post', ALERTS_BASE_URL)
         .send(input)
         .expect(200);
-      await Dashboard.deleteOne({ _id: input.dashboardId });
+      dashboardsRepo.remove(input.dashboardId, team._id);
 
       const fetched = await authRequest(
         'get',

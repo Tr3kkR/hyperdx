@@ -14,18 +14,19 @@ HyperDX can be deployed in a few different ways:
 ## Bring Your Own ClickHouse
 
 If you already have an existing ClickHouse cluster, you can simply deploy a
-HyperDX container that connects to your ClickHouse cluster. You'll need a
-separate MongoDB instance to persist your users, dashboards, searches and more.
+HyperDX container that connects to your ClickHouse cluster. Users, dashboards,
+searches, and other application state persist in a local SQLite file.
 
 To get started, you can run the following image:
 
 ```bash
-docker run -e MONGO_URI=mongodb://YOUR_MONGODB_URI -p 8080:8080 docker.hyperdx.io/hyperdx/hyperdx:2-beta
+docker run -e SQLITE_PATH=/data/hyperdx.db -v hyperdx-data:/data -p 8080:8080 docker.hyperdx.io/hyperdx/hyperdx:2-beta
 ```
 
-You'll need to set the `MONGO_URI` environment variable to the URI of your
-MongoDB instance. Afterwards, you'll want to visit http://localhost:8080 to set
-up your connection with ClickHouse.
+Visit http://localhost:8080 to set up your connection with ClickHouse. Keep the
+SQLite volume on local disk; do not place it on NFS. Back it up with
+`sqlite3 /data/hyperdx.db ".backup /data/backup.db"` from inside the container,
+or stop the container and copy the database file.
 
 Before deploying into production, you'll want to set the
 `EXPRESS_SESSION_SECRET` environment variable to a random string.
@@ -37,7 +38,7 @@ the URL your HyperDX instance is hosted on.
 
 The easiest way to get started with HyperDX from scratch is to use our
 all-in-one Docker Compose stack. This stack will start ClickHouse, an
-OpenTelemetry collector, and HyperDX with a MongoDB instance.
+OpenTelemetry collector, and HyperDX with a persistent SQLite volume.
 
 To get started, clone this repository and run the following command:
 
@@ -62,7 +63,7 @@ variable to a random string.
 
 HyperDX can also be deployed alongside your existing local development stack to
 help you debug issues locally. This mode will start an OpenTelemetry collector,
-ClickHouse, and HyperDX with a MongoDB in a single instance, without any
+ClickHouse, and HyperDX with SQLite in a single instance, without any
 authentication or configuration persistence.
 
 To get started, spin up the local mode container:

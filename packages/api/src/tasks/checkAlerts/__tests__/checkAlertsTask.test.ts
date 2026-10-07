@@ -1,9 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-type-assertion -- Mock alerts and providers intentionally provide only fields exercised by each task. */
 import { ClickhouseClient } from '@hyperdx/common-utils/dist/clickhouse/node';
 import type { TSource } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
 import * as config from '@/config';
-import { ObjectId } from '@/models';
 import { AlertSource, AlertThresholdType, IAlert } from '@/models/alert';
 type ISource = TSource & { team: string };
 import { IWebhook } from '@/models/webhook';
@@ -108,13 +108,13 @@ describe('CheckAlertTask', () => {
 
       const mockAlert = {
         id: 'alert-123',
-        team: { _id: new mongoose.Types.ObjectId() },
+        team: { _id: new ObjectId() },
         source: AlertSource.SAVED_SEARCH,
         threshold: 10,
         thresholdType: AlertThresholdType.ABOVE,
         interval: '5m',
         channel: { type: 'webhook', webhookId: 'webhook-123' },
-      } as IAlert;
+      } as unknown as IAlert;
 
       const mockSource = {
         id: 'source-123',
@@ -133,12 +133,12 @@ describe('CheckAlertTask', () => {
         ],
         conn: {
           id: 'conn-123',
-          _id: new mongoose.Types.ObjectId(),
+          _id: new ObjectId(),
           host: config.CLICKHOUSE_HOST,
           username: config.CLICKHOUSE_USER,
           password: config.CLICKHOUSE_PASSWORD,
           name: '',
-          team: new mongoose.Types.ObjectId(),
+          team: new ObjectId(),
         },
         now: new Date(),
       };
@@ -179,8 +179,8 @@ describe('CheckAlertTask', () => {
       const task = new CheckAlertTask(args);
 
       // Create two teams
-      const team1Id = new mongoose.Types.ObjectId();
-      const team2Id = new mongoose.Types.ObjectId();
+      const team1Id = new ObjectId();
+      const team2Id = new ObjectId();
 
       const mockAlert1 = {
         id: 'alert-123',
@@ -190,7 +190,7 @@ describe('CheckAlertTask', () => {
         thresholdType: AlertThresholdType.ABOVE,
         interval: '5m',
         channel: { type: 'webhook', webhookId: 'webhook-team1' },
-      } as IAlert;
+      } as unknown as IAlert;
 
       const mockAlert2 = {
         id: 'alert-456',
@@ -200,7 +200,7 @@ describe('CheckAlertTask', () => {
         thresholdType: AlertThresholdType.BELOW,
         interval: '1m',
         channel: { type: 'webhook', webhookId: 'webhook-team2' },
-      } as IAlert;
+      } as unknown as IAlert;
 
       const mockSource = {
         id: 'source-123',
@@ -219,7 +219,7 @@ describe('CheckAlertTask', () => {
         ],
         conn: {
           id: 'conn-123',
-          _id: new mongoose.Types.ObjectId(),
+          _id: new ObjectId(),
           host: config.CLICKHOUSE_HOST,
           username: config.CLICKHOUSE_USER,
           password: config.CLICKHOUSE_PASSWORD,
@@ -240,7 +240,7 @@ describe('CheckAlertTask', () => {
         ],
         conn: {
           id: 'conn-456',
-          _id: new mongoose.Types.ObjectId(),
+          _id: new ObjectId(),
           host: config.CLICKHOUSE_HOST,
           username: config.CLICKHOUSE_USER,
           password: config.CLICKHOUSE_PASSWORD,
@@ -342,7 +342,7 @@ describe('CheckAlertTask', () => {
       const buildAlertTask = (
         connId: string,
         alertId: string,
-        teamId: mongoose.Types.ObjectId,
+        teamId: ObjectId,
       ) =>
         ({
           alerts: [
@@ -367,7 +367,7 @@ describe('CheckAlertTask', () => {
           ],
           conn: {
             id: connId,
-            _id: new mongoose.Types.ObjectId(),
+            _id: new ObjectId(),
             host: config.CLICKHOUSE_HOST,
             username: config.CLICKHOUSE_USER,
             password: config.CLICKHOUSE_PASSWORD,
@@ -382,7 +382,7 @@ describe('CheckAlertTask', () => {
         onUnhandledRejection = reason => unhandledRejections.push(reason);
         process.on('unhandledRejection', onUnhandledRejection);
 
-        const teamId = new mongoose.Types.ObjectId();
+        const teamId = new ObjectId();
         mockAlertProvider.getAlertTasks.mockResolvedValue([
           buildAlertTask('conn-broken', 'alert-broken', teamId),
           buildAlertTask('conn-healthy', 'alert-healthy', teamId),

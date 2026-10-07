@@ -1,4 +1,4 @@
-import { ObjectId } from 'mongodb';
+import { ObjectId } from 'bson';
 import request, { SuperAgentTest } from 'supertest';
 
 import type { TeamDoc as ITeam } from '@/db/repos/teams';

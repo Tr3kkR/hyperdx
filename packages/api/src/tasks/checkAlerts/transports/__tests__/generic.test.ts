@@ -2,7 +2,7 @@ import {
   DEFAULT_INCIDENT_IO_WEBHOOK_BODY,
   WebhookService,
 } from '@hyperdx/common-utils/dist/types';
-import { ObjectId } from 'mongodb';
+import { ObjectId } from 'bson';
 
 import { AlertState } from '@/models/alert';
 import {

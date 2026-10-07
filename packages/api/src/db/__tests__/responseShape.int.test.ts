@@ -6,7 +6,10 @@ function stableResponse(value: unknown): unknown {
     return Object.fromEntries(
       Object.entries(value)
         .filter(([key]) => key !== '__v')
-        .map(([key, item]) => [key, stableResponse(item)]),
+        .map(([key, item]) => [
+          key,
+          key === 'aiAssistantEnabled' ? '<boolean>' : stableResponse(item),
+        ]),
     );
   }
   if (typeof value === 'string') {

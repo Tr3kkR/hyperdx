@@ -4,8 +4,8 @@ import {
   OnboardingTaskId,
   SourceKind,
 } from '@hyperdx/common-utils/dist/types';
+import { ObjectId } from 'bson';
 import { omit } from 'lodash';
-import { ObjectId } from 'mongodb';
 import request from 'supertest';
 
 import * as config from '@/config';

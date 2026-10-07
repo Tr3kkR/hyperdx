@@ -38,7 +38,6 @@ export const HYPERDX_LOG_LEVEL = env.HYPERDX_LOG_LEVEL as string;
 export const IS_CI = NODE_ENV === 'test';
 export const IS_DEV = NODE_ENV === 'development';
 export const IS_PROD = NODE_ENV === 'production';
-export const MONGO_URI = env.MONGO_URI;
 export const SQLITE_PATH = env.SQLITE_PATH || './hyperdx.db';
 export const OTEL_SERVICE_NAME = env.OTEL_SERVICE_NAME as string;
 export const PORT = Number.parseInt(env.PORT as string);
@@ -69,7 +68,12 @@ export const EXTERNAL_API_RATE_LIMIT_MAX = (() => {
 })();
 
 // FOR CI ONLY
-export const CLICKHOUSE_HOST = env.CLICKHOUSE_HOST as string;
+// Jest workers have separate ClickHouse containers because integration suites
+// truncate telemetry tables during setup.
+export const CLICKHOUSE_HOST =
+  process.env.JEST_WORKER_ID === '2' && env.CLICKHOUSE_HOST_2
+    ? (env.CLICKHOUSE_HOST_2 as string)
+    : (env.CLICKHOUSE_HOST as string);
 export const CLICKHOUSE_USER = env.CLICKHOUSE_USER as string;
 export const CLICKHOUSE_PASSWORD = env.CLICKHOUSE_PASSWORD as string;
 

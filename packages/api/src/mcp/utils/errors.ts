@@ -1,5 +1,6 @@
-import mongoose from 'mongoose';
 import { z } from 'zod';
+
+import { isId } from '@/db/ids';
 
 /**
  * Error category for MCP tool failures.
@@ -62,14 +63,14 @@ export function mcpServerError(text: string): McpErrorResult {
 }
 
 /**
- * Validate that a string is a valid MongoDB ObjectId.
+ * Validate a 24-character hex id.
  * Returns an MCP error result if invalid, or `null` if valid.
  */
 export function validateObjectId(
   id: string,
   label: string,
 ): McpErrorResult | null {
-  if (!mongoose.Types.ObjectId.isValid(id)) {
+  if (!isId(id)) {
     return mcpUserError(`Invalid ${label}`);
   }
   return null;

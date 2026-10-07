@@ -1,6 +1,6 @@
 /* eslint-disable security/detect-non-literal-fs-filename */
+import { ObjectId } from 'bson';
 import fs from 'fs';
-import mongoose from 'mongoose';
 import os from 'os';
 import path from 'path';
 
@@ -356,7 +356,7 @@ describe('provisionDashboards', () => {
     });
 
     it('skips provisioning when team ID is valid but does not exist', async () => {
-      const nonExistentId = new mongoose.Types.ObjectId().toHexString();
+      const nonExistentId = new ObjectId().toHexString();
       fs.writeFileSync(
         path.join(tmpDir, 'test.json'),
         JSON.stringify({

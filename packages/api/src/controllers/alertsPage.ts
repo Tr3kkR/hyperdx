@@ -4,8 +4,8 @@ import { z } from 'zod';
 import { type AlertPageRefs, withDisplayRefs } from '@/controllers/alerts';
 import * as alertsRepo from '@/db/repos/alerts';
 import { hydrateUsers } from '@/db/repos/users';
-import type { ObjectId } from '@/models';
 import { AlertSource, AlertState } from '@/models/alert';
+import type { ObjectId } from '@/models/ids';
 import { decodeCursor, encodeCursor } from '@/utils/pagination';
 import { objectIdSchema, stringListQueryParam, tagsSchema } from '@/utils/zod';
 

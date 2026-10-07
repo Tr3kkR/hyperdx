@@ -1,9 +1,9 @@
 import { MetricsDataType, SourceKind } from '@hyperdx/common-utils/dist/types';
-import mongoose from 'mongoose';
+import { ObjectId } from 'bson';
 
+import { getDb } from '@/db';
 import { DEFAULT_DATABASE } from '@/fixtures';
 import { callTool, getFirstText } from '@/mcp/__tests__/mcpTestUtils';
-import Dashboard from '@/models/dashboard';
 import { createDashboardFixture } from '@/test/sqliteMetadata';
 import { findDashboardFixture } from '@/test/sqliteMetadata';
 import { createSourceFixture } from '@/test/sqliteMetadata';
@@ -332,7 +332,13 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       expect(text).toContain('Filtered SQL');
 
       // Nothing should have been persisted.
-      expect(await Dashboard.countDocuments({})).toBe(0);
+      expect(
+        (
+          getDb().prepare('SELECT count(*) AS n FROM dashboards').get() as {
+            n: number;
+          }
+        ).n,
+      ).toBe(0);
     });
 
     it('should reject a raw SQL tile that uses $__sourceTable without a sourceId', async () => {
@@ -360,7 +366,13 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       expect(text).toContain('Source Table SQL');
 
       // Nothing should have been persisted.
-      expect(await Dashboard.countDocuments({})).toBe(0);
+      expect(
+        (
+          getDb().prepare('SELECT count(*) AS n FROM dashboards').get() as {
+            n: number;
+          }
+        ).n,
+      ).toBe(0);
     });
 
     it('should allow a raw SQL tile without a sourceId when it does not use $__filters', async () => {
@@ -3284,7 +3296,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
 
     it('should reject a table tile onClick referencing a non-existent dashboard', async () => {
       const sourceId = ctx.traceSource._id.toString();
-      const ghostDashboardId = new mongoose.Types.ObjectId().toString();
+      const ghostDashboardId = new ObjectId().toString();
       const result = await callTool(ctx.client!, 'clickstack_save_dashboard', {
         name: 'OnClick missing dashboard',
         tiles: [
@@ -3473,7 +3485,7 @@ describe('MCP Dashboard Tools - clickstack_save_dashboard', () => {
       expect(createResult.isError).toBeFalsy();
       const created = JSON.parse(getFirstText(createResult));
 
-      const ghostDashboardId = new mongoose.Types.ObjectId().toString();
+      const ghostDashboardId = new ObjectId().toString();
       const updateResult = await callTool(
         ctx.client!,
         'clickstack_save_dashboard',
